@@ -1,0 +1,35 @@
+# Unreal Engine generated directories
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+LocalBuilds/
+
+# Visual Studio
+.vs/
+.vscode/
+*.VC.db
+*.VC.opendb
+*.suo
+*.user
+
+# Generated project files
+*.sln
+*.slnx
+*.VCXProj
+*.VCXProj.filters
+*.VCXProj.user
+
+# Build outputs
+*.pdb
+*.obj
+*.ipch
+*.log
+
+# Operating system files
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# Rider
+.idea/
