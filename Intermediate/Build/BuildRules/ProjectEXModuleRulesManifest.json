@@ -1,0 +1,10 @@
+{
+	"SourceFiles": [
+		"C:\\Users\\Dennis\\Documents\\GitHub\\project-ex\\Source\\ProjectEX\\ProjectEX.Build.cs",
+		"C:\\Users\\Dennis\\Documents\\GitHub\\project-ex\\Plugins\\VisualStudioTools\\Source\\VisualStudioBlueprintDebuggerHelper\\VisualStudioBlueprintDebuggerHelper.Build.cs",
+		"C:\\Users\\Dennis\\Documents\\GitHub\\project-ex\\Plugins\\VisualStudioTools\\Source\\VisualStudioTools\\VisualStudioTools.Build.cs",
+		"C:\\Users\\Dennis\\Documents\\GitHub\\project-ex\\Source\\ProjectEX.Target.cs",
+		"C:\\Users\\Dennis\\Documents\\GitHub\\project-ex\\Source\\ProjectEXEditor.Target.cs"
+	],
+	"EngineVersion": "5.8.3"
+}
