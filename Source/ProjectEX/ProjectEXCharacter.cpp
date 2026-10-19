@@ -9,6 +9,7 @@
 #include "InputActionValue.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ProjectEX.h"
+#include "ProjectEXInteractionComponent.h"
 
 AProjectEXCharacter::AProjectEXCharacter()
 {
@@ -32,6 +33,8 @@ AProjectEXCharacter::AProjectEXCharacter()
 	FirstPersonCameraComponent->bEnableFirstPersonScale = true;
 	FirstPersonCameraComponent->FirstPersonFieldOfView = 70.0f;
 	FirstPersonCameraComponent->FirstPersonScale = 0.6f;
+
+	InteractionComponent = CreateDefaultSubobject<UProjectEXInteractionComponent>(TEXT("Interaction"));
 
 	// configure the character comps
 	GetMesh()->SetOwnerNoSee(true);
@@ -59,6 +62,11 @@ void AProjectEXCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 		// Looking/Aiming
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AProjectEXCharacter::LookInput);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AProjectEXCharacter::LookInput);
+
+		if (InteractionComponent)
+		{
+			InteractionComponent->BindInput(EnhancedInputComponent);
+		}
 	}
 	else
 	{

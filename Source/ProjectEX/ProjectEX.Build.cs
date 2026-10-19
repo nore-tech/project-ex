@@ -18,13 +18,15 @@ public class ProjectEX : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
+			"Slate",
+			"SlateCore"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
 		PublicIncludePaths.AddRange(new string[] {
 			"ProjectEX",
+			"ProjectEX/Interaction",
 			"ProjectEX/Variant_Horror",
 			"ProjectEX/Variant_Horror/UI",
 			"ProjectEX/Variant_Shooter",
