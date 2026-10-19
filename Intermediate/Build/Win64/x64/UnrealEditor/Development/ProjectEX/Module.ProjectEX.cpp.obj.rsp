@@ -1,0 +1,14 @@
+"C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectEX/Module.ProjectEX.cpp"
+@"C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectEX/ProjectEX.Shared.rsp"
+/FI"C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/ProjectEXEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h"
+/FI"C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectEX/Definitions.ProjectEX.h"
+/Yu"C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/ProjectEXEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h"
+/Fp"C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/ProjectEXEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h.pch"
+/Fo"C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectEX/Module.ProjectEX.cpp.obj"
+/experimental:log "C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectEX/Module.ProjectEX.cpp.sarif"
+/sourceDependencies "C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectEX/Module.ProjectEX.cpp.dep.json"
+/nologo
+/TP
+/GR-
+/std:c++20
+/wd5054

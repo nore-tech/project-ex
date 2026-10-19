@@ -1,0 +1,12 @@
+/NOLOGO
+/errorReport:prompt
+/MACHINE:x64
+/SUBSYSTEM:WINDOWS
+/experimental:deterministic
+/DEF
+/NAME:"UnrealEditor-ProjectEX.dll"
+/IGNORE:4221
+/NODEFAULTLIB
+"C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/ProjectEXEditor/Development/UnrealEd/SharedPCH.UnrealEd.Project.ValApi.ValExpApi.Cpp20.h.obj"
+"C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectEX/Module.ProjectEX.cpp.obj"
+/OUT:"C:/Users/Dennis/Documents/GitHub/project-ex/Intermediate/Build/Win64/x64/UnrealEditor/Development/ProjectEX/UnrealEditor-ProjectEX.lib"
