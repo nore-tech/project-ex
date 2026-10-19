@@ -493,7 +493,7 @@ Possible Traders
 
 11.1 Overview
 
-Support for 1–4 players in cooperative PvE raids.
+Support for 1–3 players in cooperative PvE raids.
 
 Initial Networking Approach: Listen server
 
