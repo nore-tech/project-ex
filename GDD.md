@@ -1,13 +1,13 @@
 GAME DESIGN DOCUMENT
 
-Project: [Working Title]
+Project: Project EX
 
-Version: 0.1
 Engine: Unreal Engine 5
 Genre: First-Person PvE Extraction Shooter
-Players: 1–4 (Solo / Cooperative)
-Art Style: TBD (Low-poly / Stylized / Semi-realistic)
-Development Status: Pre-production
+Players: 1–3 (Solo / Cooperative)
+Art Style: Low-Poly
+
+I want this to be DARK, maybe horror adjacent? I want the vibe to be unique, I love the cult stuff in tarkov. I love games that do a modern crossover with fantasy/cryptid/horror. SCP stuff, but I dont know the SCP copy pasta slop. 
 
 ⸻
 
@@ -52,13 +52,18 @@ Player-Friendly Complexity
 * Escape from Tarkov
 * SurrounDead
 * Deadline Escape
-* [Additional Inspirations]
+* The Division (1&2)
+* Mad Max Movies
+* Literally I love this stuff, but I've grown and realized zombies are contrived and saturated. 
 
 1.4 Unique Selling Points
 
 * [What makes this different from other extraction shooters?]
+    Low barrier to entry, consistent development, Coop, PVE only to start. Unique world/systems. TBD really. 
 * [What experience should players remember?]
+    I want there to be a challenge, they should remember what it was like to tackle a challenge with a friend, or a particular cool piece of loot that they got. I think I really like reds from chinese looter games. 
 * [Why would someone choose this over existing games?]
+  Idk man. 
 
 ⸻
 
@@ -67,30 +72,36 @@ Player-Friendly Complexity
 2.1 Primary Loop
 
 1. Prepare equipment and weapons.
-2. Select a map and enter a raid.
-3. Explore, loot, fight, and complete objectives.
-4. Locate and reach an extraction point.
-5. Complete any extraction requirements.
-6. Extract successfully or die.
-7. Manage acquired loot and equipment.
-8. Visit traders, complete quests, and upgrade equipment.
-9. Repeat.
+2. Obtain Quests (Could be dailies and weeklys)
+3. Select a map and enter a raid.
+4. Explore, loot, fight, and complete objectives.
+5. Locate and reach an extraction point.
+6. Complete any extraction requirements.
+7. Extract successfully or die.
+8. Manage acquired loot and equipment.
+9. Visit traders, complete quests, and upgrade equipment.
+10. Repeat.
 
 2.2 Raid Structure
 
-Raid Duration: TBD
-Player Count: 1–4
+Raid Duration: Per Map
+Player Count: 1–3
 Map Size: Small initially, expanding to larger maps
 Respawning: Disabled
-Death Penalty: Loss of carried equipment
+Death Penalty: Loss of carried equipment, except "safe" methods
 
 Questions to Resolve:
 
 * Are raids time-limited?
+    Yes
 * Can players enter raids at different times of day?
+    a single rotating clock to keep time for all the world. 
 * Are weather conditions randomized?
+  Yes and can be tied to events
 * Can players leave raids early?
+  After 5 minutes they can leave. 
 * Does every map have multiple extraction points?
+  Some do, but I might make a linear map. 
 
 ⸻
 
@@ -102,10 +113,10 @@ Questions to Resolve:
 * Sprinting
 * Crouching
 * Prone
-* Leaning
+* Leaning (MUST, IF YOU GAME IS FPS YOU NEED LEANING DUDE)
 * Jumping
 * [Vaulting / Mantling]
-* [Additional Movement Mechanics]
+* Sliding, but how to not make this crazy
 
 3.2 Weapon Systems
 
@@ -113,27 +124,21 @@ Questions to Resolve:
 * Weapon attachments and customization.
 * Ammunition management.
 * Reloading and magazine management.
-* Weapon durability: TBD
-* Weapon malfunctions: TBD
+* Weapon durability: Yes
+* Weapon malfunctions: I mean yeah but how
+
 
 3.3 Damage & Health
 
-* Player health system: TBD
-* Individual body-part damage: TBD
-* Armor and penetration mechanics: TBD
-* Healing and medical items: TBD
+* Player health system: Yes
+* Individual body-part damage: I wish, not sure how. 
+* Armor and penetration mechanics: Math or something, idk maybe a flat 4>3 = 100% damage and 3>4 = 70% damage or something.
+* Healing and medical items: I think Bleeds, splints, surgery?, medkits of diff levels, stims? Crafting in raid? Probably not.
 * Injury mechanics: TBD
 
 3.4 Combat Philosophy
 
-[Describe how combat should feel.]
-
-Examples:
-
-* Tactical rather than arcade-like.
-* High lethality.
-* Positioning and preparation matter.
-* Weapons should feel responsive and satisfying.
+Combat should feel good, smooth like a call of duty, however, recoil should matter, attachements and weight should affect how fast you aim. You should be able to lean annd hold an angle for Ai to walk into. Flash grenades can blind you, grenades etc. A good mix of tatical with also being able to do crazy fast fun movement/shooting, but if you make a positioning mistake you can get got. Headshots should feel REALLY good somehow. 
 
 ⸻
 
@@ -155,6 +160,7 @@ Planned Features:
 * Pop-out sorting table.
 * Item stacking.
 * Context menus.
+* Automatically Moving items to fill empty slots if you try and drag something on top. 
 
 4.2 Storage Cases
 
@@ -166,12 +172,17 @@ Examples:
 * Ammunition cases.
 * Medical cases.
 * General storage cases.
+* BIG VERSION of cases
+* Key case
+* Badge (like dogtags) case
+* Attachement storage?
+* What about gear storage? Backpack/presets?
 
 Questions:
 
-* Can cases be taken into raids?
-* Are cases restricted to certain item categories?
-* Can players upgrade stash capacity?
+* Can cases be taken into raids? SOME not all. 
+* Are cases restricted to certain item categories? YES. 
+* Can players upgrade stash capacity? Should be quest rewards and/or levels/cost. 
 
 4.3 Equipment Slots
 
@@ -183,11 +194,12 @@ Questions:
 * Tactical rig
 * Backpack
 * Pockets
-* Additional slots: TBD
+* Secure Pouch Slot
+* Slots for "special" things like compass, map etc. 
 
 4.4 Inventory Quality of Life
 
-[Record desired improvements over existing extraction shooters.]
+EHHHH, I will come up with this as I play test. Im so picky. 
 
 ⸻
 
@@ -197,31 +209,34 @@ Questions:
 
 Maps progressively increase in difficulty, enemy equipment quality, and potential rewards.
 
-Earlier maps remain accessible and relevant.
+Earlier maps remain accessible and relevant. Maybe rare keys that have crazy loot in them? Bosses drop rare keys? 
 
 5.2 Planned Maps
 
-Map 1: [Name]
+Map 1: Town Of Sunnyside
 
-* Theme: Industrial / Military / Rural
+* Theme: Small Remote Town, maybe kinda western, cabin in the woods. Core town space, with some outbuildings, a main road. Not easy to get lost. 
 * Size: Small
 * Difficulty: Beginner
-* Factions: TBD
-* Points of Interest: TBD
-* Extractions: TBD
-* Unique Mechanics: TBD
+* Factions: Fanatics, Enemy Survivors
+* Points of Interest: Bank, Sherriff station, general store
+* Extractions: End of the road big baracade, boat on the coast or something, a car that can be in the woods but is conditional 
+* Unique Mechanics: Nothing, No dangers outside of the core game. 
 
-Map 2: [Name]
+Map 2: Happy Acres Statepark
 
-* Theme: TBD
-* Size: TBD
+* Theme: Scary forest, big center focus of a church with outbuildings, small cabins dotted, campsites, moonshine place maybe
+* Size: Medium
 * Difficulty: Intermediate
-* Factions: TBD
-* Points of Interest: TBD
-* Extractions: TBD
+* Factions: Fanatics, Cultists, Enemy survivors
+* Points of Interest: Church, Bunker/Basement Scary, Hillbilly trailer/Moonshine Place
+* Extractions: ATV randomly available, plane?, idk tbd.
 
 Future Maps
-[Ideas for additional locations.]
+More Town, maybe a mall/warehouse that is part of the town, some major plot point that keeps the town alive but was actually the bad guys place
+A big CITY
+A BIG Hospital or asylum or something
+Farm?
 
 5.3 Environmental Design
 
