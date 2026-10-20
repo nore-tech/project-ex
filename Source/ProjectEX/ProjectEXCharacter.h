@@ -13,6 +13,9 @@ class UCameraComponent;
 class UInputAction;
 class UProjectEXInteractionComponent;
 class UProjectEXInventoryComponent;
+class UProjectEXLootComponent;
+class UProjectEXHealthComponent;
+class UProjectEXWeaponComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -40,6 +43,16 @@ class AProjectEXCharacter : public ACharacter
 	/** Per-player inventory. Does not affect movement or camera. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UProjectEXInventoryComponent> InventoryComponent;
+
+	/** Searchable container session. Does not affect movement or camera. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UProjectEXLootComponent> LootComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UProjectEXHealthComponent> HealthComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UProjectEXWeaponComponent> WeaponComponent;
 
 protected:
 
@@ -88,8 +101,13 @@ protected:
 
 protected:
 
-	/** Set up input action bindings */
+	void ApplyPolygonMeshes();
+
+	virtual void BeginPlay() override;
 	virtual void SetupPlayerInputComponent(UInputComponent* InputComponent) override;
+
+	UFUNCTION()
+	void HandleDied(AController* InstigatorController);
 	
 
 public:
@@ -105,6 +123,13 @@ public:
 
 	/** Returns the inventory component **/
 	UProjectEXInventoryComponent* GetInventoryComponent() const { return InventoryComponent; }
+
+	/** Returns the loot container session **/
+	UProjectEXLootComponent* GetLootComponent() const { return LootComponent; }
+
+	UProjectEXHealthComponent* GetHealthComponent() const { return HealthComponent; }
+
+	UProjectEXWeaponComponent* GetWeaponComponent() const { return WeaponComponent; }
 
 };
 

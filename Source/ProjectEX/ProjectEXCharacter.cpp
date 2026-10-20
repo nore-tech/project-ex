@@ -11,6 +11,16 @@
 #include "ProjectEX.h"
 #include "ProjectEXInteractionComponent.h"
 #include "ProjectEXInventoryComponent.h"
+#include "ProjectEXLootComponent.h"
+#include "ProjectEXHealthComponent.h"
+#include "ProjectEXWeaponComponent.h"
+
+namespace
+{
+	const TCHAR* PolygonBodyMeshPath = TEXT("/Game/PolygonPrototype/Meshes/CharacterUE4Mannequin/SK_Character_Dummy_Male_01.SK_Character_Dummy_Male_01");
+	const TCHAR* PolygonArmsMeshPath = TEXT("/Game/PolygonPrototype/Meshes/CharacterUE4Mannequin/Hands/SK_Character_FPS_Arms_01.SK_Character_FPS_Arms_01");
+	const TCHAR* PolygonBodyAnimPath = TEXT("/Game/PolygonPrototype/EpicContent/Mannequin/Animations/ThirdPerson_AnimBP.ThirdPerson_AnimBP_C");
+}
 
 AProjectEXCharacter::AProjectEXCharacter()
 {
@@ -37,6 +47,10 @@ AProjectEXCharacter::AProjectEXCharacter()
 
 	InteractionComponent = CreateDefaultSubobject<UProjectEXInteractionComponent>(TEXT("Interaction"));
 	InventoryComponent = CreateDefaultSubobject<UProjectEXInventoryComponent>(TEXT("Inventory"));
+	LootComponent = CreateDefaultSubobject<UProjectEXLootComponent>(TEXT("Loot"));
+	HealthComponent = CreateDefaultSubobject<UProjectEXHealthComponent>(TEXT("Health"));
+	HealthComponent->SetMaxHealth(100.0f);
+	WeaponComponent = CreateDefaultSubobject<UProjectEXWeaponComponent>(TEXT("Weapon"));
 
 	// configure the character comps
 	GetMesh()->SetOwnerNoSee(true);
@@ -74,6 +88,11 @@ void AProjectEXCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 		{
 			InventoryComponent->BindInput(EnhancedInputComponent);
 		}
+
+		if (WeaponComponent)
+		{
+			WeaponComponent->BindInput(EnhancedInputComponent);
+		}
 	}
 	else
 	{
@@ -81,6 +100,46 @@ void AProjectEXCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 	}
 }
 
+
+void AProjectEXCharacter::ApplyPolygonMeshes()
+{
+	if (USkeletalMesh* BodyMesh = LoadObject<USkeletalMesh>(nullptr, PolygonBodyMeshPath))
+	{
+		GetMesh()->SetSkeletalMeshAsset(BodyMesh);
+		if (UClass* BodyAnim = LoadClass<UAnimInstance>(nullptr, PolygonBodyAnimPath))
+		{
+			GetMesh()->SetAnimInstanceClass(BodyAnim);
+		}
+	}
+
+	if (USkeletalMesh* ArmsMesh = LoadObject<USkeletalMesh>(nullptr, PolygonArmsMeshPath))
+	{
+		FirstPersonMesh->SetSkeletalMeshAsset(ArmsMesh);
+		FirstPersonMesh->SetAnimInstanceClass(nullptr);
+		// The camera stays on this mesh. The visible arms are a local copy under the weapon view.
+		FirstPersonMesh->SetVisibility(false);
+	}
+}
+
+void AProjectEXCharacter::BeginPlay()
+{
+	ApplyPolygonMeshes();
+	Super::BeginPlay();
+
+	if (HealthComponent)
+	{
+		HealthComponent->OnDied.AddDynamic(this, &AProjectEXCharacter::HandleDied);
+	}
+}
+
+void AProjectEXCharacter::HandleDied(AController* InstigatorController)
+{
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->StopMovementImmediately();
+		Movement->DisableMovement();
+	}
+}
 
 void AProjectEXCharacter::MoveInput(const FInputActionValue& Value)
 {
@@ -114,6 +173,11 @@ void AProjectEXCharacter::DoAim(float Yaw, float Pitch)
 
 void AProjectEXCharacter::DoMove(float Right, float Forward)
 {
+	if (HealthComponent && HealthComponent->IsDead())
+	{
+		return;
+	}
+
 	if (GetController())
 	{
 		// pass the move inputs
@@ -124,6 +188,11 @@ void AProjectEXCharacter::DoMove(float Right, float Forward)
 
 void AProjectEXCharacter::DoJumpStart()
 {
+	if (HealthComponent && HealthComponent->IsDead())
+	{
+		return;
+	}
+
 	// pass Jump to the character
 	Jump();
 }

@@ -22,12 +22,15 @@ public class ProjectEX : ModuleRules
 			"SlateCore"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] {
+			"AnimationCore"
+		});
 
 		PublicIncludePaths.AddRange(new string[] {
 			"ProjectEX",
 			"ProjectEX/Interaction",
 			"ProjectEX/Inventory",
+			"ProjectEX/Combat",
 			"ProjectEX/Variant_Horror",
 			"ProjectEX/Variant_Horror/UI",
 			"ProjectEX/Variant_Shooter",

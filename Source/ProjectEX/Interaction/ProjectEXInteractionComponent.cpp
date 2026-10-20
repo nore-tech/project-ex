@@ -4,6 +4,7 @@
 #include "ProjectEXInteractable.h"
 #include "ProjectEXInteractionPromptWidget.h"
 #include "ProjectEXCharacter.h"
+#include "ProjectEXHealthComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
@@ -86,6 +87,14 @@ void UProjectEXInteractionComponent::BindInput(UEnhancedInputComponent* Enhanced
 
 void UProjectEXInteractionComponent::RequestInteract()
 {
+	if (const UProjectEXHealthComponent* Health = GetOwner() ? GetOwner()->FindComponentByClass<UProjectEXHealthComponent>() : nullptr)
+	{
+		if (Health->IsDead())
+		{
+			return;
+		}
+	}
+
 	AActor* Target = FocusedActor.Get();
 	if (!Target)
 	{
@@ -102,6 +111,14 @@ void UProjectEXInteractionComponent::RequestInteract()
 
 void UProjectEXInteractionComponent::ServerRequestInteract_Implementation(AActor* Target)
 {
+	if (const UProjectEXHealthComponent* Health = GetOwner() ? GetOwner()->FindComponentByClass<UProjectEXHealthComponent>() : nullptr)
+	{
+		if (Health->IsDead())
+		{
+			return;
+		}
+	}
+
 	AActor* TracedTarget = TraceInteractable();
 	APawn* Pawn = Cast<APawn>(GetOwner());
 	if (!Pawn || !TracedTarget || TracedTarget != Target)

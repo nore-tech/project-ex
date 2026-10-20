@@ -2,7 +2,9 @@
 
 #include "ProjectEXInventoryComponent.h"
 #include "ProjectEX.h"
+#include "ProjectEXHealthComponent.h"
 #include "ProjectEXItemDefinition.h"
+#include "ProjectEXLootComponent.h"
 #include "ProjectEXPickup.h"
 #include "Engine/LocalPlayer.h"
 #include "Engine/World.h"
@@ -30,6 +32,7 @@ UProjectEXInventoryComponent::UProjectEXInventoryComponent()
 	SetIsReplicatedByDefault(true);
 	ToggleInventoryKey = EKeys::Tab;
 	RotateItemKey = EKeys::R;
+	Equipment.SetNum(static_cast<int32>(EProjectEXEquipmentSlot::Backpack) + 1);
 }
 
 void UProjectEXInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -37,6 +40,7 @@ void UProjectEXInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimePr
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME_CONDITION(UProjectEXInventoryComponent, Entries, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UProjectEXInventoryComponent, Equipment, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UProjectEXInventoryComponent, GridColumns, COND_OwnerOnly);
 	DOREPLIFETIME_CONDITION(UProjectEXInventoryComponent, GridRows, COND_OwnerOnly);
 }
@@ -90,7 +94,7 @@ void UProjectEXInventoryComponent::BindInput(UEnhancedInputComponent* EnhancedIn
 	}
 }
 
-int32 UProjectEXInventoryComponent::AddItem(UProjectEXItemDefinition* Definition, int32 Quantity)
+int32 UProjectEXInventoryComponent::AddItem(UProjectEXItemDefinition* Definition, int32 Quantity, int32 MagazineRounds)
 {
 	if (!HasInventoryAuthority() || !Definition || Quantity <= 0)
 	{
@@ -180,6 +184,7 @@ int32 UProjectEXInventoryComponent::AddItem(UProjectEXItemDefinition* Definition
 		NewEntry.GridX = Plan.X;
 		NewEntry.GridY = Plan.Y;
 		NewEntry.bRotated = Plan.bRotated;
+		NewEntry.MagazineRounds = MagazineRounds;
 	}
 
 	for (const FStackPlan& Plan : StackPlans)
@@ -224,6 +229,91 @@ int32 UProjectEXInventoryComponent::RemoveItem(int32 EntryId, int32 Quantity)
 	}
 
 	return 0;
+}
+
+bool UProjectEXInventoryComponent::SetEntryMagazine(int32 EntryId, int32 MagazineRounds)
+{
+	if (!HasInventoryAuthority())
+	{
+		return false;
+	}
+
+	FProjectEXInventoryEntry* Entry = FindEntry(EntryId);
+	if (!Entry)
+	{
+		return false;
+	}
+
+	Entry->MagazineRounds = MagazineRounds;
+	NotifyChanged();
+	return true;
+}
+
+int32 UProjectEXInventoryComponent::GetEntryMagazine(int32 EntryId) const
+{
+	const FProjectEXInventoryEntry* Entry = FindEntry(EntryId);
+	return Entry ? Entry->MagazineRounds : -1;
+}
+
+int32 UProjectEXInventoryComponent::CountItem(const UProjectEXItemDefinition* Definition) const
+{
+	if (!Definition)
+	{
+		return 0;
+	}
+
+	int32 Total = 0;
+	for (const FProjectEXInventoryEntry& Entry : Entries)
+	{
+		if (Entry.Definition == Definition)
+		{
+			Total += FMath::Max(0, Entry.Quantity);
+		}
+	}
+
+	return Total;
+}
+
+int32 UProjectEXInventoryComponent::ConsumeItem(UProjectEXItemDefinition* Definition, int32 Quantity)
+{
+	if (!HasInventoryAuthority() || !Definition || Quantity <= 0)
+	{
+		return 0;
+	}
+
+	struct FTake
+	{
+		int32 EntryId = INDEX_NONE;
+		int32 Amount = 0;
+	};
+
+	TArray<FTake> Takes;
+	int32 Remaining = Quantity;
+	for (const FProjectEXInventoryEntry& Entry : Entries)
+	{
+		if (Remaining <= 0)
+		{
+			break;
+		}
+
+		if (Entry.Definition != Definition || Entry.Quantity <= 0)
+		{
+			continue;
+		}
+
+		FTake& Take = Takes.AddDefaulted_GetRef();
+		Take.EntryId = Entry.EntryId;
+		Take.Amount = FMath::Min(Entry.Quantity, Remaining);
+		Remaining -= Take.Amount;
+	}
+
+	int32 Removed = 0;
+	for (const FTake& Take : Takes)
+	{
+		Removed += RemoveItem(Take.EntryId, Take.Amount);
+	}
+
+	return Removed;
 }
 
 void UProjectEXInventoryComponent::RequestMoveItem(int32 EntryId, int32 GridX, int32 GridY, bool bRotated)
@@ -280,6 +370,553 @@ void UProjectEXInventoryComponent::ServerDropStack_Implementation(int32 EntryId)
 	}
 }
 
+void UProjectEXInventoryComponent::RequestEquip(int32 EntryId, EProjectEXEquipmentSlot Slot)
+{
+	if (HasInventoryAuthority())
+	{
+		EquipItem(EntryId, Slot);
+		return;
+	}
+
+	ServerEquip(EntryId, Slot);
+}
+
+void UProjectEXInventoryComponent::ServerEquip_Implementation(int32 EntryId, EProjectEXEquipmentSlot Slot)
+{
+	EquipItem(EntryId, Slot);
+}
+
+void UProjectEXInventoryComponent::RequestAutoEquip(int32 EntryId)
+{
+	if (HasInventoryAuthority())
+	{
+		AutoEquip(EntryId);
+		return;
+	}
+
+	ServerAutoEquip(EntryId);
+}
+
+void UProjectEXInventoryComponent::ServerAutoEquip_Implementation(int32 EntryId)
+{
+	AutoEquip(EntryId);
+}
+
+void UProjectEXInventoryComponent::RequestUnequipAt(EProjectEXEquipmentSlot Slot, int32 GridX, int32 GridY, bool bRotated)
+{
+	if (HasInventoryAuthority())
+	{
+		UnequipAt(Slot, GridX, GridY, bRotated);
+		return;
+	}
+
+	ServerUnequipAt(Slot, GridX, GridY, bRotated);
+}
+
+void UProjectEXInventoryComponent::ServerUnequipAt_Implementation(EProjectEXEquipmentSlot Slot, int32 GridX, int32 GridY, bool bRotated)
+{
+	UnequipAt(Slot, GridX, GridY, bRotated);
+}
+
+void UProjectEXInventoryComponent::RequestMoveEquipped(EProjectEXEquipmentSlot FromSlot, EProjectEXEquipmentSlot ToSlot)
+{
+	if (HasInventoryAuthority())
+	{
+		MoveEquipped(FromSlot, ToSlot);
+		return;
+	}
+
+	ServerMoveEquipped(FromSlot, ToSlot);
+}
+
+void UProjectEXInventoryComponent::ServerMoveEquipped_Implementation(EProjectEXEquipmentSlot FromSlot, EProjectEXEquipmentSlot ToSlot)
+{
+	MoveEquipped(FromSlot, ToSlot);
+}
+
+void UProjectEXInventoryComponent::ShowInventory()
+{
+	if (!IsLocalOwner() || bInventoryOpen)
+	{
+		return;
+	}
+
+	ToggleInventory();
+}
+
+bool UProjectEXInventoryComponent::AutoEquipNewest(const UProjectEXItemDefinition* Definition)
+{
+	if (!HasInventoryAuthority() || !Definition || Definition->EquipKind == EProjectEXEquipKind::None)
+	{
+		return false;
+	}
+
+	const int32 EntryId = FindNewestEntryId(Definition);
+	return EntryId != INDEX_NONE && AutoEquip(EntryId);
+}
+
+void UProjectEXInventoryComponent::RequestUnequip(EProjectEXEquipmentSlot Slot)
+{
+	if (HasInventoryAuthority())
+	{
+		UnequipItem(Slot);
+		return;
+	}
+
+	ServerUnequip(Slot);
+}
+
+void UProjectEXInventoryComponent::ServerUnequip_Implementation(EProjectEXEquipmentSlot Slot)
+{
+	UnequipItem(Slot);
+}
+
+void UProjectEXInventoryComponent::RequestUseItem(int32 EntryId)
+{
+	if (HasInventoryAuthority())
+	{
+		UseItem(EntryId);
+		return;
+	}
+
+	ServerUseItem(EntryId);
+}
+
+void UProjectEXInventoryComponent::ServerUseItem_Implementation(int32 EntryId)
+{
+	UseItem(EntryId);
+}
+
+bool UProjectEXInventoryComponent::GetEquippedItem(EProjectEXEquipmentSlot Slot, FProjectEXEquippedItem& OutItem) const
+{
+	const FProjectEXEquippedItem* Found = FindEquipmentSlot(Slot);
+	if (!Found)
+	{
+		return false;
+	}
+
+	OutItem = *Found;
+	return true;
+}
+
+bool UProjectEXInventoryComponent::SetEquippedMagazine(EProjectEXEquipmentSlot Slot, int32 MagazineRounds)
+{
+	if (!HasInventoryAuthority())
+	{
+		return false;
+	}
+
+	FProjectEXEquippedItem* Found = FindEquipmentSlot(Slot);
+	if (!Found || !Found->IsOccupied())
+	{
+		return false;
+	}
+
+	Found->MagazineRounds = MagazineRounds;
+	NotifyChanged();
+	return true;
+}
+
+bool UProjectEXInventoryComponent::SlotAcceptsItem(EProjectEXEquipmentSlot Slot, const UProjectEXItemDefinition* Definition)
+{
+	if (!Definition)
+	{
+		return false;
+	}
+
+	switch (Slot)
+	{
+	case EProjectEXEquipmentSlot::PrimaryWeapon:
+	case EProjectEXEquipmentSlot::SecondaryWeapon:
+		return Definition->EquipKind == EProjectEXEquipKind::Weapon;
+	case EProjectEXEquipmentSlot::Helmet:
+		return Definition->EquipKind == EProjectEXEquipKind::Helmet;
+	case EProjectEXEquipmentSlot::BodyArmor:
+		return Definition->EquipKind == EProjectEXEquipKind::BodyArmor;
+	case EProjectEXEquipmentSlot::Backpack:
+		return Definition->EquipKind == EProjectEXEquipKind::Backpack;
+	default:
+		return false;
+	}
+}
+
+FProjectEXEquippedItem* UProjectEXInventoryComponent::FindEquipmentSlot(EProjectEXEquipmentSlot Slot)
+{
+	const int32 Index = static_cast<int32>(Slot);
+	return Equipment.IsValidIndex(Index) ? &Equipment[Index] : nullptr;
+}
+
+const FProjectEXEquippedItem* UProjectEXInventoryComponent::FindEquipmentSlot(EProjectEXEquipmentSlot Slot) const
+{
+	const int32 Index = static_cast<int32>(Slot);
+	return Equipment.IsValidIndex(Index) ? &Equipment[Index] : nullptr;
+}
+
+bool UProjectEXInventoryComponent::TakeEntry(int32 EntryId, FProjectEXInventoryEntry& OutEntry)
+{
+	for (int32 Index = 0; Index < Entries.Num(); ++Index)
+	{
+		if (Entries[Index].EntryId != EntryId)
+		{
+			continue;
+		}
+
+		OutEntry = Entries[Index];
+		Entries.RemoveAt(Index);
+		return true;
+	}
+
+	return false;
+}
+
+bool UProjectEXInventoryComponent::EquipItem(int32 EntryId, EProjectEXEquipmentSlot Slot)
+{
+	if (!HasInventoryAuthority())
+	{
+		return false;
+	}
+
+	const FProjectEXInventoryEntry* Source = FindEntry(EntryId);
+	FProjectEXEquippedItem* Destination = FindEquipmentSlot(Slot);
+	if (!Source || !Source->Definition || Source->Quantity <= 0 || !Destination || Destination->IsOccupied())
+	{
+		return false;
+	}
+
+	if (!SlotAcceptsItem(Slot, Source->Definition))
+	{
+		return false;
+	}
+
+	FProjectEXInventoryEntry Taken;
+	if (!TakeEntry(EntryId, Taken))
+	{
+		return false;
+	}
+
+	Destination->Definition = Taken.Definition;
+	Destination->Quantity = Taken.Quantity;
+	Destination->MagazineRounds = Taken.MagazineRounds;
+	NotifyChanged();
+	return true;
+}
+
+bool UProjectEXInventoryComponent::AutoEquip(int32 EntryId)
+{
+	if (!HasInventoryAuthority())
+	{
+		return false;
+	}
+
+	const FProjectEXInventoryEntry* Source = FindEntry(EntryId);
+	if (!Source || !Source->Definition || Source->Quantity <= 0)
+	{
+		return false;
+	}
+
+	const UProjectEXItemDefinition* Definition = Source->Definition;
+	EProjectEXEquipmentSlot Slot = EProjectEXEquipmentSlot::PrimaryWeapon;
+	switch (Definition->EquipKind)
+	{
+	case EProjectEXEquipKind::Weapon:
+	{
+		const FProjectEXEquippedItem* Primary = FindEquipmentSlot(EProjectEXEquipmentSlot::PrimaryWeapon);
+		const FProjectEXEquippedItem* Secondary = FindEquipmentSlot(EProjectEXEquipmentSlot::SecondaryWeapon);
+		if (Primary && !Primary->IsOccupied())
+		{
+			Slot = EProjectEXEquipmentSlot::PrimaryWeapon;
+		}
+		else if (Secondary && !Secondary->IsOccupied())
+		{
+			Slot = EProjectEXEquipmentSlot::SecondaryWeapon;
+		}
+		else
+		{
+			return false;
+		}
+		break;
+	}
+	case EProjectEXEquipKind::Helmet:
+		Slot = EProjectEXEquipmentSlot::Helmet;
+		break;
+	case EProjectEXEquipKind::BodyArmor:
+		Slot = EProjectEXEquipmentSlot::BodyArmor;
+		break;
+	case EProjectEXEquipKind::Backpack:
+		Slot = EProjectEXEquipmentSlot::Backpack;
+		break;
+	default:
+		return false;
+	}
+
+	const FProjectEXEquippedItem* Destination = FindEquipmentSlot(Slot);
+	if (!Destination || Destination->IsOccupied())
+	{
+		return false;
+	}
+
+	return EquipItem(EntryId, Slot);
+}
+
+int32 UProjectEXInventoryComponent::FindNewestEntryId(const UProjectEXItemDefinition* Definition) const
+{
+	int32 BestId = INDEX_NONE;
+	for (const FProjectEXInventoryEntry& Entry : Entries)
+	{
+		if (Entry.Definition == Definition && Entry.EntryId > BestId)
+		{
+			BestId = Entry.EntryId;
+		}
+	}
+
+	return BestId;
+}
+
+bool UProjectEXInventoryComponent::UnequipItem(EProjectEXEquipmentSlot Slot)
+{
+	if (!HasInventoryAuthority())
+	{
+		return false;
+	}
+
+	FProjectEXEquippedItem* Source = FindEquipmentSlot(Slot);
+	if (!Source || !Source->IsOccupied())
+	{
+		return false;
+	}
+
+	const int32 Added = AddItem(Source->Definition, Source->Quantity, Source->MagazineRounds);
+	if (Added != Source->Quantity)
+	{
+		return false;
+	}
+
+	Source->Definition = nullptr;
+	Source->Quantity = 0;
+	Source->MagazineRounds = -1;
+	NotifyChanged();
+	return true;
+}
+
+bool UProjectEXInventoryComponent::UnequipAt(EProjectEXEquipmentSlot Slot, int32 GridX, int32 GridY, bool bRotated)
+{
+	if (!HasInventoryAuthority())
+	{
+		return false;
+	}
+
+	FProjectEXEquippedItem* Source = FindEquipmentSlot(Slot);
+	if (!Source || !Source->IsOccupied() || !Source->Definition)
+	{
+		return false;
+	}
+
+	if (!CanAcceptItem(Source->Definition, Source->Quantity, Source->MagazineRounds, GridX, GridY, bRotated))
+	{
+		return false;
+	}
+
+	const FProjectEXEquippedItem Previous = *Source;
+	Source->Definition = nullptr;
+	Source->Quantity = 0;
+	Source->MagazineRounds = -1;
+	if (!InsertItemAt(Previous.Definition, Previous.Quantity, Previous.MagazineRounds, GridX, GridY, bRotated))
+	{
+		*Source = Previous;
+		NotifyChanged();
+		return false;
+	}
+
+	return true;
+}
+
+bool UProjectEXInventoryComponent::MoveEquipped(EProjectEXEquipmentSlot FromSlot, EProjectEXEquipmentSlot ToSlot)
+{
+	if (!HasInventoryAuthority() || FromSlot == ToSlot)
+	{
+		return false;
+	}
+
+	FProjectEXEquippedItem* Source = FindEquipmentSlot(FromSlot);
+	FProjectEXEquippedItem* Destination = FindEquipmentSlot(ToSlot);
+	if (!Source || !Destination || !Source->IsOccupied() || Destination->IsOccupied() || !SlotAcceptsItem(ToSlot, Source->Definition))
+	{
+		return false;
+	}
+
+	*Destination = *Source;
+	Source->Definition = nullptr;
+	Source->Quantity = 0;
+	Source->MagazineRounds = -1;
+	NotifyChanged();
+	return true;
+}
+
+bool UProjectEXInventoryComponent::TakeEquippedItem(EProjectEXEquipmentSlot Slot, FProjectEXEquippedItem& OutItem)
+{
+	if (!HasInventoryAuthority())
+	{
+		return false;
+	}
+
+	FProjectEXEquippedItem* Source = FindEquipmentSlot(Slot);
+	if (!Source || !Source->IsOccupied())
+	{
+		return false;
+	}
+
+	OutItem = *Source;
+	Source->Definition = nullptr;
+	Source->Quantity = 0;
+	Source->MagazineRounds = -1;
+	NotifyChanged();
+	return true;
+}
+
+bool UProjectEXInventoryComponent::ReceiveEquippedItem(EProjectEXEquipmentSlot Slot, UProjectEXItemDefinition* Definition, int32 Quantity, int32 MagazineRounds)
+{
+	if (!HasInventoryAuthority() || !Definition || Quantity <= 0)
+	{
+		return false;
+	}
+
+	FProjectEXEquippedItem* Destination = FindEquipmentSlot(Slot);
+	if (!Destination || Destination->IsOccupied() || !SlotAcceptsItem(Slot, Definition))
+	{
+		return false;
+	}
+
+	Destination->Definition = Definition;
+	Destination->Quantity = Quantity;
+	Destination->MagazineRounds = MagazineRounds;
+	NotifyChanged();
+	return true;
+}
+
+bool UProjectEXInventoryComponent::CanAcceptItem(const UProjectEXItemDefinition* Definition, int32 Quantity, int32 MagazineRounds, int32 GridX, int32 GridY, bool bRotated) const
+{
+	if (!Definition || Quantity <= 0)
+	{
+		return false;
+	}
+
+	const FIntPoint Size = Definition->GetGridSize(bRotated);
+	if (GridX < 0 || GridY < 0 || GridX + Size.X > GetGridColumns() || GridY + Size.Y > GetGridRows())
+	{
+		return false;
+	}
+
+	const FProjectEXInventoryEntry* MergeTarget = nullptr;
+	for (const FProjectEXInventoryEntry& Other : Entries)
+	{
+		if (!Other.Definition || Other.Quantity <= 0)
+		{
+			continue;
+		}
+
+		const FIntPoint OtherSize = Other.Definition->GetGridSize(Other.bRotated);
+		if (!RectsOverlap(GridX, GridY, Size.X, Size.Y, Other.GridX, Other.GridY, OtherSize.X, OtherSize.Y))
+		{
+			continue;
+		}
+
+		const int32 MaxStack = FMath::Max(1, Other.Definition->MaxStackSize);
+		const bool bSameStack = Other.Definition == Definition;
+		if (MergeTarget || !bSameStack || Other.Quantity + Quantity > MaxStack)
+		{
+			return false;
+		}
+
+		MergeTarget = &Other;
+	}
+
+	return true;
+}
+
+bool UProjectEXInventoryComponent::InsertItemAt(UProjectEXItemDefinition* Definition, int32 Quantity, int32 MagazineRounds, int32 GridX, int32 GridY, bool bRotated)
+{
+	if (!HasInventoryAuthority() || !CanAcceptItem(Definition, Quantity, MagazineRounds, GridX, GridY, bRotated))
+	{
+		return false;
+	}
+
+	const FIntPoint Size = Definition->GetGridSize(bRotated);
+	for (FProjectEXInventoryEntry& Other : Entries)
+	{
+		if (!Other.Definition || Other.Quantity <= 0)
+		{
+			continue;
+		}
+
+		const FIntPoint OtherSize = Other.Definition->GetGridSize(Other.bRotated);
+		if (!RectsOverlap(GridX, GridY, Size.X, Size.Y, Other.GridX, Other.GridY, OtherSize.X, OtherSize.Y))
+		{
+			continue;
+		}
+
+		Other.Quantity += Quantity;
+		NotifyChanged();
+		return true;
+	}
+
+	FProjectEXInventoryEntry& NewEntry = Entries.AddDefaulted_GetRef();
+	NewEntry.EntryId = NextEntryId++;
+	NewEntry.Definition = Definition;
+	NewEntry.Quantity = Quantity;
+	NewEntry.GridX = GridX;
+	NewEntry.GridY = GridY;
+	NewEntry.bRotated = bRotated;
+	NewEntry.MagazineRounds = MagazineRounds;
+	NotifyChanged();
+	return true;
+}
+
+void UProjectEXInventoryComponent::ShowSearchedContainer(AProjectEXLootContainer* Container)
+{
+	ShowInventory();
+	if (InventoryWidget)
+	{
+		InventoryWidget->SetSearchedContainer(Container);
+	}
+}
+
+void UProjectEXInventoryComponent::ClearSearchedContainer()
+{
+	if (InventoryWidget)
+	{
+		InventoryWidget->SetSearchedContainer(nullptr);
+	}
+}
+
+bool UProjectEXInventoryComponent::UseItem(int32 EntryId)
+{
+	if (!HasInventoryAuthority())
+	{
+		return false;
+	}
+
+	const FProjectEXInventoryEntry* Entry = FindEntry(EntryId);
+	UProjectEXHealthComponent* Health = GetOwner() ? GetOwner()->FindComponentByClass<UProjectEXHealthComponent>() : nullptr;
+	if (!Entry || !Entry->Definition || Entry->Quantity <= 0 || Entry->Definition->HealAmount <= 0.0f || !Health || Health->IsDead())
+	{
+		return false;
+	}
+
+	if (Health->GetHealth() >= Health->GetMaxHealth())
+	{
+		return false;
+	}
+
+	const float Restored = Health->Heal(Entry->Definition->HealAmount);
+	if (Restored <= 0.0f)
+	{
+		return false;
+	}
+
+	RemoveItem(EntryId, 1);
+	return true;
+}
+
 void UProjectEXInventoryComponent::ToggleInventory()
 {
 	if (!IsLocalOwner())
@@ -306,6 +943,14 @@ void UProjectEXInventoryComponent::ToggleInventory()
 		InventoryWidget->CancelDrag();
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 		SetInventoryInputMode(false);
+
+		if (UProjectEXLootComponent* Loot = GetOwner()->FindComponentByClass<UProjectEXLootComponent>())
+		{
+			if (Loot->IsLootOpen())
+			{
+				Loot->RequestClose();
+			}
+		}
 	}
 }
 
@@ -333,6 +978,11 @@ int32 UProjectEXInventoryComponent::GetOccupiedCellCount() const
 }
 
 void UProjectEXInventoryComponent::OnRep_Entries()
+{
+	NotifyChanged();
+}
+
+void UProjectEXInventoryComponent::OnRep_Equipment()
 {
 	NotifyChanged();
 }
@@ -439,6 +1089,7 @@ bool UProjectEXInventoryComponent::DropItem(int32 EntryId, int32 Quantity)
 		return false;
 	}
 
+	const int32 SavedMagazine = Entry->MagazineRounds;
 	const int32 DropQuantity = FMath::Min(Quantity, Entry->Quantity);
 
 	UWorld* World = GetWorld();
@@ -469,6 +1120,7 @@ bool UProjectEXInventoryComponent::DropItem(int32 EntryId, int32 Quantity)
 	}
 
 	Pickup->SetItemStack(Definition, DropQuantity);
+	Pickup->SetStoredMagazine(SavedMagazine);
 	Pickup->FinishSpawning(SpawnTransform);
 
 	if (!IsValid(Pickup))

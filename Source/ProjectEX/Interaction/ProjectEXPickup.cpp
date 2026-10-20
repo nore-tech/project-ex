@@ -4,6 +4,8 @@
 #include "ProjectEX.h"
 #include "ProjectEXInventoryComponent.h"
 #include "ProjectEXItemDefinition.h"
+#include "Components/BoxComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/Pawn.h"
 #include "Net/UnrealNetwork.h"
@@ -28,6 +30,24 @@ AProjectEXPickup::AProjectEXPickup()
 	}
 
 	ConfigureMeshCollision();
+
+	InteractionVolume = CreateDefaultSubobject<UBoxComponent>(TEXT("InteractionVolume"));
+	InteractionVolume->SetupAttachment(Mesh);
+	InteractionVolume->SetBoxExtent(FVector(40.0f, 40.0f, 40.0f));
+	InteractionVolume->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	InteractionVolume->SetCollisionResponseToAllChannels(ECR_Ignore);
+	InteractionVolume->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+	InteractionVolume->SetGenerateOverlapEvents(false);
+	InteractionVolume->SetCanEverAffectNavigation(false);
+	InteractionVolume->SetUsingAbsoluteScale(true);
+	InteractionVolume->SetRelativeScale3D(FVector::OneVector);
+
+	DisplaySkeletalMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("DisplaySkeletalMesh"));
+	DisplaySkeletalMesh->SetupAttachment(Mesh);
+	DisplaySkeletalMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	DisplaySkeletalMesh->SetUsingAbsoluteScale(true);
+	DisplaySkeletalMesh->SetCastShadow(true);
+	DisplaySkeletalMesh->SetVisibility(false);
 
 	InteractionPrompt = NSLOCTEXT("ProjectEX", "PickupPrompt", "Pick Up");
 
@@ -81,6 +101,7 @@ void AProjectEXPickup::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 
 	DOREPLIFETIME(AProjectEXPickup, ItemDefinition);
 	DOREPLIFETIME(AProjectEXPickup, Quantity);
+	DOREPLIFETIME(AProjectEXPickup, StoredMagazine);
 }
 
 FText AProjectEXPickup::GetInteractionPrompt_Implementation() const
@@ -121,7 +142,7 @@ void AProjectEXPickup::Interact_Implementation(APawn* Interactor)
 	}
 
 	bCollected = true;
-	const int32 Added = Inventory->AddItem(ItemDefinition, Quantity);
+	const int32 Added = Inventory->AddItem(ItemDefinition, Quantity, StoredMagazine);
 	if (Added != Quantity)
 	{
 		bCollected = false;
@@ -144,6 +165,16 @@ void AProjectEXPickup::SetItemStack(UProjectEXItemDefinition* InDefinition, int3
 	ApplyVisuals();
 }
 
+void AProjectEXPickup::SetStoredMagazine(int32 InMagazineRounds)
+{
+	if (HasActorBegunPlay() && !HasAuthority())
+	{
+		return;
+	}
+
+	StoredMagazine = InMagazineRounds;
+}
+
 void AProjectEXPickup::OnRep_ItemStack()
 {
 	ApplyVisuals();
@@ -160,11 +191,46 @@ void AProjectEXPickup::ApplyVisuals()
 	{
 		const bool bWasSimulating = Mesh->IsSimulatingPhysics();
 		Mesh->SetStaticMesh(WorldMesh);
+		const float ScaledExtent = (WorldMesh->GetBounds().BoxExtent * Mesh->GetRelativeScale3D()).GetAbsMax();
+		if (ScaledExtent > 45.0f)
+		{
+			Mesh->SetRelativeScale3D(Mesh->GetRelativeScale3D() * (45.0f / ScaledExtent));
+		}
+		else if (ScaledExtent > KINDA_SMALL_NUMBER && ScaledExtent < 18.0f)
+		{
+			Mesh->SetRelativeScale3D(Mesh->GetRelativeScale3D() * (22.0f / ScaledExtent));
+		}
 		ConfigureMeshCollision();
 		if (bWasSimulating)
 		{
 			Mesh->SetSimulatePhysics(true);
 		}
+	}
+
+	USkeletalMesh* SkeletalMesh = ItemDefinition->WorldMesh.IsNull()
+		? ItemDefinition->DisplaySkeletalMesh.LoadSynchronous()
+		: nullptr;
+	if (SkeletalMesh && DisplaySkeletalMesh)
+	{
+		DisplaySkeletalMesh->SetSkeletalMeshAsset(SkeletalMesh);
+		DisplaySkeletalMesh->SetWorldScale3D(FVector(ItemDefinition->DisplaySkeletalScale));
+		DisplaySkeletalMesh->SetRelativeRotation(ItemDefinition->DisplaySkeletalRotation);
+		DisplaySkeletalMesh->SetVisibility(true);
+		Mesh->SetVisibility(false);
+	}
+	else
+	{
+		Mesh->SetVisibility(true);
+		if (DisplaySkeletalMesh)
+		{
+			DisplaySkeletalMesh->SetVisibility(false);
+		}
+	}
+
+	if (InteractionVolume)
+	{
+		InteractionVolume->SetUsingAbsoluteScale(true);
+		InteractionVolume->SetRelativeScale3D(FVector::OneVector);
 	}
 }
 

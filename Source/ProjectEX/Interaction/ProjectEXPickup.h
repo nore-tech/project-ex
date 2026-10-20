@@ -7,7 +7,9 @@
 #include "ProjectEXInteractable.h"
 #include "ProjectEXPickup.generated.h"
 
+class UBoxComponent;
 class UProjectEXItemDefinition;
+class USkeletalMeshComponent;
 class UStaticMeshComponent;
 
 /**
@@ -22,6 +24,10 @@ class PROJECTEX_API AProjectEXPickup : public AActor, public IProjectEXInteracta
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UStaticMeshComponent> Mesh;
 
+	/** Fixed look target so a thin or buried visual can still be picked up. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
+	TObjectPtr<UBoxComponent> InteractionVolume;
+
 protected:
 
 	/** Verb used when this pickup has no item definition. */
@@ -33,6 +39,10 @@ protected:
 
 	UPROPERTY(ReplicatedUsing=OnRep_ItemStack, EditAnywhere, BlueprintReadOnly, Category="Pickup", meta=(ClampMin="1"))
 	int32 Quantity = 1;
+
+	/** Loaded rounds carried by a dropped weapon. -1 means the next owner receives a full magazine. */
+	UPROPERTY(ReplicatedUsing=OnRep_ItemStack, EditAnywhere, BlueprintReadOnly, Category="Pickup")
+	int32 StoredMagazine = -1;
 
 	/** Speed applied when this pickup is dropped. */
 	UPROPERTY(EditAnywhere, Category="Pickup|Drop", meta=(ClampMin="0.0", Units="cm/s"))
@@ -59,12 +69,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Pickup")
 	void SetItemStack(UProjectEXItemDefinition* InDefinition, int32 InQuantity);
 
+	/** Authority, or a pickup that has not begun play yet, may set the magazine carried with a dropped weapon. */
+	UFUNCTION(BlueprintCallable, Category="Pickup")
+	void SetStoredMagazine(int32 InMagazineRounds);
+
 	/** Server-only. Simulates a short drop, replicates physics, then sleeps when the item settles. */
 	void StartDropPhysics();
 
 	UStaticMeshComponent* GetMesh() const { return Mesh; }
 	UProjectEXItemDefinition* GetItemDefinition() const { return ItemDefinition; }
 	int32 GetQuantity() const { return Quantity; }
+	int32 GetStoredMagazine() const { return StoredMagazine; }
 
 protected:
 
@@ -80,6 +95,10 @@ private:
 
 	/** Server latch so a second interact cannot collect the same pickup. */
 	bool bCollected = false;
+
+	/** Visual for a skeletal item. The static mesh remains the physics root. */
+	UPROPERTY()
+	TObjectPtr<USkeletalMeshComponent> DisplaySkeletalMesh;
 
 	bool bDropPhysicsActive = false;
 	float DropRestElapsed = 0.0f;

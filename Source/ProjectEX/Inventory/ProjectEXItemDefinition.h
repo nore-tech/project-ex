@@ -4,10 +4,33 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DataAsset.h"
+#include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/Texture2D.h"
 #include "ProjectEXPickup.h"
 #include "ProjectEXItemDefinition.generated.h"
+
+/** Which worn slot an item can occupy. Weapons fit either weapon slot. */
+UENUM(BlueprintType)
+enum class EProjectEXEquipKind : uint8
+{
+	None,
+	Weapon,
+	Helmet,
+	BodyArmor,
+	Backpack
+};
+
+/** The five worn slots. */
+UENUM(BlueprintType)
+enum class EProjectEXEquipmentSlot : uint8
+{
+	PrimaryWeapon,
+	SecondaryWeapon,
+	Helmet,
+	BodyArmor,
+	Backpack
+};
 
 /**
  *  Data asset that describes one item type.
@@ -57,6 +80,24 @@ public:
 	/** Optional mesh applied to the world pickup. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item")
 	TSoftObjectPtr<UStaticMesh> WorldMesh;
+
+	/** Shown on the pickup when no static world mesh is set. Used for skeletal weapons. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item")
+	TSoftObjectPtr<USkeletalMesh> DisplaySkeletalMesh;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item")
+	FRotator DisplaySkeletalRotation = FRotator(0.0f, -90.0f, 0.0f);
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item", meta=(ClampMin="0.01"))
+	float DisplaySkeletalScale = 1.0f;
+
+	/** None keeps the item in the grid only. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item")
+	EProjectEXEquipKind EquipKind = EProjectEXEquipKind::None;
+
+	/** Health restored when one of this item is used. Zero means it is not a medical item. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item", meta=(ClampMin="0.0"))
+	float HealAmount = 0.0f;
 
 	UFUNCTION(BlueprintPure, Category="Item")
 	FName GetItemId() const;
