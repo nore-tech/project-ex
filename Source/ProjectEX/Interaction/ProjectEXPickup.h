@@ -45,11 +45,11 @@ protected:
 	int32 StoredMagazine = -1;
 
 	/** Speed applied when this pickup is dropped. */
-	UPROPERTY(EditAnywhere, Category="Pickup|Drop", meta=(ClampMin="0.0", Units="cm/s"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Pickup|Drop", meta=(ClampMin="0.0", Units="cm/s"))
 	float DropImpulseSpeed = 180.0f;
 
 	/** How long the item must stay nearly still before physics turns off. */
-	UPROPERTY(EditAnywhere, Category="Pickup|Drop", meta=(ClampMin="0.1", Units="s"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Pickup|Drop", meta=(ClampMin="0.1", Units="s"))
 	float DropRestTime = 0.5f;
 
 public:
@@ -75,6 +75,10 @@ public:
 
 	/** Server-only. Simulates a short drop, replicates physics, then sleeps when the item settles. */
 	void StartDropPhysics();
+
+	/** Cosmetic only. Called on the server after the stack is added, before this actor is destroyed. */
+	UFUNCTION(BlueprintImplementableEvent, Category="Pickup")
+	void OnItemPickedUp(APawn* Interactor, UProjectEXItemDefinition* Item, int32 PickedQuantity);
 
 	UStaticMeshComponent* GetMesh() const { return Mesh; }
 	UProjectEXItemDefinition* GetItemDefinition() const { return ItemDefinition; }

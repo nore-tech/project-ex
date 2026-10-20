@@ -17,7 +17,7 @@ class USkeletalMeshComponent;
 class UStaticMeshComponent;
 
 /** Equips a weapon item from the inventory and fires it with server-authoritative hits. */
-UCLASS(ClassGroup=(Combat), meta=(BlueprintSpawnableComponent))
+UCLASS(Blueprintable, ClassGroup=(Combat), meta=(BlueprintSpawnableComponent))
 class PROJECTEX_API UProjectEXWeaponComponent : public UActorComponent
 {
 	GENERATED_BODY()
@@ -46,6 +46,14 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Weapon")
 	bool IsAiming() const;
+
+	/** Cosmetic only. Runs after the server accepts a shot and multicasts the shot effect. */
+	UFUNCTION(BlueprintImplementableEvent, Category="Weapon|Presentation")
+	void OnWeaponFired();
+
+	/** Cosmetic only. Runs after a reload consumes reserve ammunition. */
+	UFUNCTION(BlueprintImplementableEvent, Category="Weapon|Presentation")
+	void OnWeaponReloaded();
 
 	/** Look input added by gameplay recoil this frame, so the viewmodel does not sway from it. */
 	float ConsumeRecoilPitch();

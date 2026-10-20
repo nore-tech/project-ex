@@ -572,6 +572,8 @@ void UProjectEXWeaponComponent::MulticastFireFX_Implementation(FVector TraceStar
 		PlayShotSound(Muzzle);
 	}
 
+	OnWeaponFired();
+
 	if (!GetWorld() || !EquippedWeapon || EquippedWeapon->TracerInterval <= 0)
 	{
 		return;
@@ -733,6 +735,7 @@ void UProjectEXWeaponComponent::FinishReload()
 	if (Taken > 0)
 	{
 		Inventory->SetEquippedMagazine(ActiveWeaponSlot, Rounds + Taken);
+		OnWeaponReloaded();
 	}
 }
 

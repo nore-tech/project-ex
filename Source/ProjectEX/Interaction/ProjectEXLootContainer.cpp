@@ -92,6 +92,7 @@ void AProjectEXLootContainer::Interact_Implementation(APawn* Interactor)
 	if (UProjectEXLootComponent* Loot = Interactor->FindComponentByClass<UProjectEXLootComponent>())
 	{
 		Loot->OpenLoot(this);
+		OnContainerOpened(Interactor);
 	}
 }
 

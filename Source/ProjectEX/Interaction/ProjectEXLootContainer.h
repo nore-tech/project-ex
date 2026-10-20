@@ -13,7 +13,7 @@ class UStaticMeshComponent;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FProjectEXContainerChanged);
 
 /** Searchable container with a grid smaller than the player inventory. */
-UCLASS()
+UCLASS(Blueprintable)
 class PROJECTEX_API AProjectEXLootContainer : public AActor, public IProjectEXInteractable
 {
 	GENERATED_BODY()
@@ -64,6 +64,10 @@ public:
 
 	FText GetContainerName() const;
 
+	/** Cosmetic only. Called on the server when a pawn opens this container. */
+	UFUNCTION(BlueprintImplementableEvent, Category="Loot")
+	void OnContainerOpened(APawn* Interactor);
+
 	UPROPERTY(BlueprintAssignable, Category="Loot")
 	FProjectEXContainerChanged OnContentsChanged;
 
@@ -72,13 +76,13 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category="Loot")
 	FText ContainerName;
 
-	UPROPERTY(VisibleAnywhere, Category="Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UStaticMeshComponent> Mesh;
 
-	UPROPERTY(EditAnywhere, Replicated, Category="Loot", meta=(ClampMin="1"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category="Loot", meta=(ClampMin="1"))
 	int32 GridColumns = 6;
 
-	UPROPERTY(EditAnywhere, Replicated, Category="Loot", meta=(ClampMin="1"))
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category="Loot", meta=(ClampMin="1"))
 	int32 GridRows = 4;
 
 	UPROPERTY(ReplicatedUsing=OnRep_Contents)

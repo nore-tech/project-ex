@@ -9,7 +9,7 @@
 class UProjectEXWeaponData;
 
 /** Inventory item that can be equipped as a firearm. Its stats live on a weapon data asset. */
-UCLASS(BlueprintType)
+UCLASS(Blueprintable, BlueprintType)
 class PROJECTEX_API UProjectEXWeaponItemDefinition : public UProjectEXItemDefinition
 {
 	GENERATED_BODY()

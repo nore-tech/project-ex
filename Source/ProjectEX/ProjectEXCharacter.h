@@ -23,7 +23,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
 /**
  *  A basic first person character
  */
-UCLASS(abstract)
+UCLASS(abstract, Blueprintable)
 class AProjectEXCharacter : public ACharacter
 {
 	GENERATED_BODY()
@@ -71,6 +71,14 @@ protected:
 	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	class UInputAction* MouseLookAction;
+
+	/** Copied onto CharacterMovement. Existing falling brake. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement", meta=(ClampMin="0.0", AllowPrivateAccess="true"))
+	float FallingBrakingDeceleration = 1500.0f;
+
+	/** Copied onto CharacterMovement. Existing air control. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement", meta=(ClampMin="0.0", ClampMax="1.0", AllowPrivateAccess="true"))
+	float AirControl = 0.5f;
 	
 public:
 	AProjectEXCharacter();

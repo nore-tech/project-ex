@@ -30,7 +30,7 @@ enum class EProjectEXGripStyle : uint8
 /**
  *  Configurable firearm. Create one data asset per weapon instead of a new C++ class.
  */
-UCLASS(BlueprintType)
+UCLASS(Blueprintable, BlueprintType)
 class PROJECTEX_API UProjectEXWeaponData : public UPrimaryDataAsset
 {
 	GENERATED_BODY()

@@ -36,7 +36,7 @@ enum class EProjectEXEquipmentSlot : uint8
  *  Data asset that describes one item type.
  *  Create assets in the editor instead of adding item classes in C++.
  */
-UCLASS(BlueprintType)
+UCLASS(Blueprintable, BlueprintType)
 class PROJECTEX_API UProjectEXItemDefinition : public UPrimaryDataAsset
 {
 	GENERATED_BODY()

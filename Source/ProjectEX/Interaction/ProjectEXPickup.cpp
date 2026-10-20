@@ -150,6 +150,7 @@ void AProjectEXPickup::Interact_Implementation(APawn* Interactor)
 		return;
 	}
 
+	OnItemPickedUp(Interactor, ItemDefinition, Added);
 	Destroy();
 }
 

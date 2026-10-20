@@ -55,3 +55,63 @@ As of 10/19/2026 there is no need for new branches. Just use main.
 1. Establish core player movement and interactions.
 
 Focus on the current task rather than implementing future features prematurely.
+
+## Context Management
+
+START OF A NEW TASK:
+
+1. Read AGENTS.md.
+2. Read docs/PROJECT_STATE.md.
+3. Read docs/CODEBASE_MAP.md only when locating code.
+4. Read docs/DECISIONS.md only when relevant.
+5. Inspect only source files required for the task.
+6. Do not assume previous chat context is available.
+
+DURING DEVELOPMENT:
+
+- Treat source code as authoritative when documentation conflicts with implementation.
+- Avoid broad repository searches.
+- Do not reread unchanged files.
+- Do not generate unnecessary documentation.
+- Do not perform unrelated refactoring.
+- Do not modify maps unless explicitly requested.
+- Preserve existing working functionality.
+
+AFTER MEANINGFUL CHANGES:
+
+- Update PROJECT_STATE.md.
+- Update CODEBASE_MAP.md only when important classes or APIs change.
+- Update DECISIONS.md only for new decisions.
+- Keep documentation factual and concise.
+
+WHEN CONTEXT IS RUNNING LOW:
+
+1. Finish or safely stop the current operation.
+2. Record completed work.
+3. Record incomplete work.
+4. Record relevant modified files.
+5. Record known errors and blockers.
+6. Record the exact next action.
+7. Recommend continuing in a new conversation.
+
+Do not begin another major task when context is nearly exhausted.
+
+The agent cannot assume it will detect context exhaustion automatically. Maintain the project state after each meaningful task so context can be recovered at any time.
+
+## AI Agent Efficiency
+
+- Optimize for minimal tool calls and context usage.
+- Read persistent documentation before exploring code.
+- Inspect only task-relevant files.
+- Avoid scanning generated Unreal directories.
+- Avoid inspecting imported asset packs unless needed.
+- Do not repeatedly read unchanged files.
+- Do not produce extensive planning documents.
+- Do not perform unrelated refactoring.
+- Do not create unnecessary abstractions.
+- Prefer existing classes and engine functionality.
+- Avoid repeated compilation attempts.
+- Keep final reports under 100 words.
+- Update project documentation only when necessary.
+
+These rules must not prevent required validation or cause incomplete implementation.

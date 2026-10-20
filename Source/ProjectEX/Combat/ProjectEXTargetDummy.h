@@ -12,7 +12,7 @@ class UStaticMeshComponent;
 class UTextRenderComponent;
 
 /** Placeable practice target. It has no AI and can be reset in place. */
-UCLASS()
+UCLASS(Blueprintable)
 class PROJECTEX_API AProjectEXTargetDummy : public AActor, public IProjectEXInteractable
 {
 	GENERATED_BODY()
@@ -30,13 +30,13 @@ public:
 
 protected:
 
-	UPROPERTY(VisibleAnywhere, Category="Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UStaticMeshComponent> Body;
 
-	UPROPERTY(VisibleAnywhere, Category="Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UStaticMeshComponent> Head;
 
-	UPROPERTY(VisibleAnywhere, Category="Components")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
 	TObjectPtr<UProjectEXHealthComponent> Health;
 
 	UPROPERTY(VisibleAnywhere, Category="Components")

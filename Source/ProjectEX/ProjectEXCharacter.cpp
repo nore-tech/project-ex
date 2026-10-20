@@ -59,8 +59,8 @@ AProjectEXCharacter::AProjectEXCharacter()
 	GetCapsuleComponent()->SetCapsuleSize(34.0f, 96.0f);
 
 	// Configure character movement
-	GetCharacterMovement()->BrakingDecelerationFalling = 1500.0f;
-	GetCharacterMovement()->AirControl = 0.5f;
+	GetCharacterMovement()->BrakingDecelerationFalling = FallingBrakingDeceleration;
+	GetCharacterMovement()->AirControl = AirControl;
 }
 
 void AProjectEXCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -123,6 +123,12 @@ void AProjectEXCharacter::ApplyPolygonMeshes()
 
 void AProjectEXCharacter::BeginPlay()
 {
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->BrakingDecelerationFalling = FallingBrakingDeceleration;
+		Movement->AirControl = AirControl;
+	}
+
 	ApplyPolygonMeshes();
 	Super::BeginPlay();
 
