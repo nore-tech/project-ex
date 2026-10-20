@@ -12,7 +12,6 @@
 /**
  *  Data asset that describes one item type.
  *  Create assets in the editor instead of adding item classes in C++.
- *  Grid size, equipment, and containers can be added here later.
  */
 UCLASS(BlueprintType)
 class PROJECTEX_API UProjectEXItemDefinition : public UPrimaryDataAsset
@@ -40,6 +39,13 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item", meta=(ClampMin="1"))
 	int32 MaxStackSize = 1;
 
+	/** Cells occupied across the inventory grid. Rotation swaps these. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item", meta=(ClampMin="1"))
+	int32 GridWidth = 1;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item", meta=(ClampMin="1"))
+	int32 GridHeight = 1;
+
 	/** Stored for later weight limits. Not enforced yet. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Item", meta=(ClampMin="0.0", Units="kg"))
 	float Weight = 0.0f;
@@ -54,6 +60,10 @@ public:
 
 	UFUNCTION(BlueprintPure, Category="Item")
 	FName GetItemId() const;
+
+	/** Occupied cells. X is width and Y is height. A 90 degree rotation swaps them. */
+	UFUNCTION(BlueprintPure, Category="Item")
+	FIntPoint GetGridSize(bool bRotated) const;
 
 	virtual FPrimaryAssetId GetPrimaryAssetId() const override;
 };

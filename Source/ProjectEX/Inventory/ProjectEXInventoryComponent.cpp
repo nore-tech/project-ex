@@ -16,11 +16,20 @@
 #include "InputMappingContext.h"
 #include "Net/UnrealNetwork.h"
 
+namespace
+{
+	bool RectsOverlap(int32 AX, int32 AY, int32 AWidth, int32 AHeight, int32 BX, int32 BY, int32 BWidth, int32 BHeight)
+	{
+		return AX < BX + BWidth && AX + AWidth > BX && AY < BY + BHeight && AY + AHeight > BY;
+	}
+}
+
 UProjectEXInventoryComponent::UProjectEXInventoryComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
 	ToggleInventoryKey = EKeys::Tab;
+	RotateItemKey = EKeys::R;
 }
 
 void UProjectEXInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -28,10 +37,17 @@ void UProjectEXInventoryComponent::GetLifetimeReplicatedProps(TArray<FLifetimePr
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 
 	DOREPLIFETIME_CONDITION(UProjectEXInventoryComponent, Entries, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UProjectEXInventoryComponent, GridColumns, COND_OwnerOnly);
+	DOREPLIFETIME_CONDITION(UProjectEXInventoryComponent, GridRows, COND_OwnerOnly);
 }
 
 void UProjectEXInventoryComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (InventoryWidget)
+	{
+		InventoryWidget->CancelDrag();
+	}
+
 	if (bInventoryOpen)
 	{
 		SetInventoryInputMode(false);
@@ -60,14 +76,18 @@ void UProjectEXInventoryComponent::BindInput(UEnhancedInputComponent* EnhancedIn
 		return;
 	}
 
-	EnsureToggleAction();
-	if (!ToggleInventoryAction)
+	EnsureInputActions();
+	RegisterMappingContext(Pawn);
+
+	if (ToggleInventoryAction)
 	{
-		return;
+		EnhancedInput->BindAction(ToggleInventoryAction, ETriggerEvent::Started, this, &UProjectEXInventoryComponent::ToggleInventory);
 	}
 
-	RegisterMappingContext(Pawn);
-	EnhancedInput->BindAction(ToggleInventoryAction, ETriggerEvent::Started, this, &UProjectEXInventoryComponent::ToggleInventory);
+	if (RotateItemAction)
+	{
+		EnhancedInput->BindAction(RotateItemAction, ETriggerEvent::Started, this, &UProjectEXInventoryComponent::HandleRotateItem);
+	}
 }
 
 int32 UProjectEXInventoryComponent::AddItem(UProjectEXItemDefinition* Definition, int32 Quantity)
@@ -77,10 +97,19 @@ int32 UProjectEXInventoryComponent::AddItem(UProjectEXItemDefinition* Definition
 		return 0;
 	}
 
+	const int32 Columns = GetGridColumns();
+	const int32 Rows = GetGridRows();
 	const int32 MaxStack = FMath::Max(1, Definition->MaxStackSize);
 	int32 Remaining = Quantity;
 
-	for (FProjectEXInventoryEntry& Entry : Entries)
+	struct FStackPlan
+	{
+		int32 EntryId = INDEX_NONE;
+		int32 Amount = 0;
+	};
+
+	TArray<FStackPlan> StackPlans;
+	for (const FProjectEXInventoryEntry& Entry : Entries)
 	{
 		if (Remaining <= 0)
 		{
@@ -92,28 +121,77 @@ int32 UProjectEXInventoryComponent::AddItem(UProjectEXItemDefinition* Definition
 			continue;
 		}
 
-		const int32 AddedToStack = FMath::Min(MaxStack - Entry.Quantity, Remaining);
-		Entry.Quantity += AddedToStack;
-		Remaining -= AddedToStack;
+		const int32 Amount = FMath::Min(MaxStack - Entry.Quantity, Remaining);
+		FStackPlan& Plan = StackPlans.AddDefaulted_GetRef();
+		Plan.EntryId = Entry.EntryId;
+		Plan.Amount = Amount;
+		Remaining -= Amount;
 	}
 
-	while (Remaining > 0 && Entries.Num() < MaxSlots)
+	TArray<uint8> Occupied;
+	Occupied.SetNumZeroed(Columns * Rows);
+	for (const FProjectEXInventoryEntry& Entry : Entries)
 	{
-		const int32 AddedToSlot = FMath::Min(MaxStack, Remaining);
+		if (!Entry.Definition || Entry.Quantity <= 0)
+		{
+			continue;
+		}
+
+		const FIntPoint Size = Entry.Definition->GetGridSize(Entry.bRotated);
+		MarkOccupied(Occupied, Entry.GridX, Entry.GridY, Size.X, Size.Y);
+	}
+
+	struct FNewPlan
+	{
+		int32 X = 0;
+		int32 Y = 0;
+		bool bRotated = false;
+		int32 Quantity = 0;
+	};
+
+	TArray<FNewPlan> NewPlans;
+	while (Remaining > 0)
+	{
+		int32 X = 0;
+		int32 Y = 0;
+		bool bRotated = false;
+		if (!FindFreePosition(Occupied, Definition, X, Y, bRotated))
+		{
+			return 0;
+		}
+
+		const FIntPoint Size = Definition->GetGridSize(bRotated);
+		const int32 Chunk = FMath::Min(MaxStack, Remaining);
+		FNewPlan& Plan = NewPlans.AddDefaulted_GetRef();
+		Plan.X = X;
+		Plan.Y = Y;
+		Plan.bRotated = bRotated;
+		Plan.Quantity = Chunk;
+		MarkOccupied(Occupied, X, Y, Size.X, Size.Y);
+		Remaining -= Chunk;
+	}
+
+	for (const FNewPlan& Plan : NewPlans)
+	{
 		FProjectEXInventoryEntry& NewEntry = Entries.AddDefaulted_GetRef();
 		NewEntry.EntryId = NextEntryId++;
 		NewEntry.Definition = Definition;
-		NewEntry.Quantity = AddedToSlot;
-		Remaining -= AddedToSlot;
+		NewEntry.Quantity = Plan.Quantity;
+		NewEntry.GridX = Plan.X;
+		NewEntry.GridY = Plan.Y;
+		NewEntry.bRotated = Plan.bRotated;
 	}
 
-	const int32 Added = Quantity - Remaining;
-	if (Added > 0)
+	for (const FStackPlan& Plan : StackPlans)
 	{
-		NotifyChanged();
+		if (FProjectEXInventoryEntry* Entry = FindEntry(Plan.EntryId))
+		{
+			Entry->Quantity += Plan.Amount;
+		}
 	}
 
-	return Added;
+	NotifyChanged();
+	return Quantity;
 }
 
 int32 UProjectEXInventoryComponent::RemoveItem(int32 EntryId, int32 Quantity)
@@ -148,11 +226,27 @@ int32 UProjectEXInventoryComponent::RemoveItem(int32 EntryId, int32 Quantity)
 	return 0;
 }
 
+void UProjectEXInventoryComponent::RequestMoveItem(int32 EntryId, int32 GridX, int32 GridY, bool bRotated)
+{
+	if (HasInventoryAuthority())
+	{
+		MoveItem(EntryId, GridX, GridY, bRotated);
+		return;
+	}
+
+	ServerMoveItem(EntryId, GridX, GridY, bRotated);
+}
+
+void UProjectEXInventoryComponent::ServerMoveItem_Implementation(int32 EntryId, int32 GridX, int32 GridY, bool bRotated)
+{
+	MoveItem(EntryId, GridX, GridY, bRotated);
+}
+
 void UProjectEXInventoryComponent::RequestDrop(int32 EntryId)
 {
 	if (HasInventoryAuthority())
 	{
-		DropItem(EntryId);
+		DropItem(EntryId, 1);
 		return;
 	}
 
@@ -161,7 +255,29 @@ void UProjectEXInventoryComponent::RequestDrop(int32 EntryId)
 
 void UProjectEXInventoryComponent::ServerDropItem_Implementation(int32 EntryId)
 {
-	DropItem(EntryId);
+	DropItem(EntryId, 1);
+}
+
+void UProjectEXInventoryComponent::RequestDropStack(int32 EntryId)
+{
+	if (HasInventoryAuthority())
+	{
+		if (const FProjectEXInventoryEntry* Entry = FindEntry(EntryId))
+		{
+			DropItem(EntryId, Entry->Quantity);
+		}
+		return;
+	}
+
+	ServerDropStack(EntryId);
+}
+
+void UProjectEXInventoryComponent::ServerDropStack_Implementation(int32 EntryId)
+{
+	if (const FProjectEXInventoryEntry* Entry = FindEntry(EntryId))
+	{
+		DropItem(EntryId, Entry->Quantity);
+	}
 }
 
 void UProjectEXInventoryComponent::ToggleInventory()
@@ -180,19 +296,48 @@ void UProjectEXInventoryComponent::ToggleInventory()
 	bInventoryOpen = !bInventoryOpen;
 	if (bInventoryOpen)
 	{
-		InventoryWidget->SetToggleKey(ToggleInventoryKey);
+		InventoryWidget->SetInputHints(ToggleInventoryKey, RotateItemKey);
 		InventoryWidget->BindInventory(this);
 		InventoryWidget->SetVisibility(ESlateVisibility::Visible);
 		SetInventoryInputMode(true);
 	}
 	else
 	{
+		InventoryWidget->CancelDrag();
 		InventoryWidget->SetVisibility(ESlateVisibility::Collapsed);
 		SetInventoryInputMode(false);
 	}
 }
 
+bool UProjectEXInventoryComponent::CanPlaceEntry(int32 EntryId, int32 GridX, int32 GridY, bool bRotated) const
+{
+	int32 MergeEntryId = INDEX_NONE;
+	return QueryPlacement(EntryId, GridX, GridY, bRotated, MergeEntryId);
+}
+
+int32 UProjectEXInventoryComponent::GetOccupiedCellCount() const
+{
+	int32 Count = 0;
+	for (const FProjectEXInventoryEntry& Entry : Entries)
+	{
+		if (!Entry.Definition || Entry.Quantity <= 0)
+		{
+			continue;
+		}
+
+		const FIntPoint Size = Entry.Definition->GetGridSize(Entry.bRotated);
+		Count += Size.X * Size.Y;
+	}
+
+	return Count;
+}
+
 void UProjectEXInventoryComponent::OnRep_Entries()
+{
+	NotifyChanged();
+}
+
+void UProjectEXInventoryComponent::OnRep_GridLayout()
 {
 	NotifyChanged();
 }
@@ -216,9 +361,73 @@ void UProjectEXInventoryComponent::NotifyChanged()
 	OnInventoryChanged.Broadcast();
 }
 
-bool UProjectEXInventoryComponent::DropItem(int32 EntryId)
+bool UProjectEXInventoryComponent::MoveItem(int32 EntryId, int32 GridX, int32 GridY, bool bRotated)
 {
 	if (!HasInventoryAuthority())
+	{
+		return false;
+	}
+
+	FProjectEXInventoryEntry* Source = FindEntry(EntryId);
+	if (!Source || !Source->Definition || Source->Quantity <= 0)
+	{
+		return false;
+	}
+
+	int32 MergeEntryId = INDEX_NONE;
+	if (!QueryPlacement(EntryId, GridX, GridY, bRotated, MergeEntryId))
+	{
+		return false;
+	}
+
+	if (MergeEntryId != INDEX_NONE)
+	{
+		FProjectEXInventoryEntry* Destination = FindEntry(MergeEntryId);
+		if (!Destination || !Destination->Definition)
+		{
+			return false;
+		}
+
+		const int32 MaxStack = FMath::Max(1, Destination->Definition->MaxStackSize);
+		const int32 Transfer = FMath::Min(FMath::Max(0, MaxStack - Destination->Quantity), Source->Quantity);
+		if (Transfer <= 0)
+		{
+			return false;
+		}
+
+		Destination->Quantity += Transfer;
+		Source->Quantity -= Transfer;
+		if (Source->Quantity <= 0)
+		{
+			for (int32 Index = 0; Index < Entries.Num(); ++Index)
+			{
+				if (Entries[Index].EntryId == EntryId)
+				{
+					Entries.RemoveAt(Index);
+					break;
+				}
+			}
+		}
+
+		NotifyChanged();
+		return true;
+	}
+
+	if (Source->GridX == GridX && Source->GridY == GridY && Source->bRotated == bRotated)
+	{
+		return true;
+	}
+
+	Source->GridX = GridX;
+	Source->GridY = GridY;
+	Source->bRotated = bRotated;
+	NotifyChanged();
+	return true;
+}
+
+bool UProjectEXInventoryComponent::DropItem(int32 EntryId, int32 Quantity)
+{
+	if (!HasInventoryAuthority() || Quantity <= 0)
 	{
 		return false;
 	}
@@ -229,6 +438,8 @@ bool UProjectEXInventoryComponent::DropItem(int32 EntryId)
 	{
 		return false;
 	}
+
+	const int32 DropQuantity = FMath::Min(Quantity, Entry->Quantity);
 
 	UWorld* World = GetWorld();
 	APawn* Pawn = Cast<APawn>(GetOwner());
@@ -257,7 +468,7 @@ bool UProjectEXInventoryComponent::DropItem(int32 EntryId)
 		return false;
 	}
 
-	Pickup->SetItemStack(Definition, 1);
+	Pickup->SetItemStack(Definition, DropQuantity);
 	Pickup->FinishSpawning(SpawnTransform);
 
 	if (!IsValid(Pickup))
@@ -268,8 +479,8 @@ bool UProjectEXInventoryComponent::DropItem(int32 EntryId)
 
 	Pickup->StartDropPhysics();
 
-	const int32 Removed = RemoveItem(EntryId, 1);
-	if (Removed != 1)
+	const int32 Removed = RemoveItem(EntryId, DropQuantity);
+	if (Removed != DropQuantity)
 	{
 		Pickup->Destroy();
 		UE_LOG(LogProjectEX, Warning, TEXT("Drop failed for entry %d. The inventory remove was rejected and the spawned pickup was destroyed."), EntryId);
@@ -330,23 +541,183 @@ FProjectEXInventoryEntry* UProjectEXInventoryComponent::FindEntry(int32 EntryId)
 	return nullptr;
 }
 
-void UProjectEXInventoryComponent::EnsureToggleAction()
+const FProjectEXInventoryEntry* UProjectEXInventoryComponent::FindEntry(int32 EntryId) const
 {
-	if (ToggleInventoryAction)
+	for (const FProjectEXInventoryEntry& Entry : Entries)
+	{
+		if (Entry.EntryId == EntryId)
+		{
+			return &Entry;
+		}
+	}
+
+	return nullptr;
+}
+
+bool UProjectEXInventoryComponent::QueryPlacement(int32 EntryId, int32 GridX, int32 GridY, bool bRotated, int32& OutMergeEntryId) const
+{
+	OutMergeEntryId = INDEX_NONE;
+
+	const FProjectEXInventoryEntry* Source = FindEntry(EntryId);
+	if (!Source || !Source->Definition || Source->Quantity <= 0)
+	{
+		return false;
+	}
+
+	const FIntPoint Size = Source->Definition->GetGridSize(bRotated);
+	if (GridX < 0 || GridY < 0 || GridX + Size.X > GetGridColumns() || GridY + Size.Y > GetGridRows())
+	{
+		return false;
+	}
+
+	const FProjectEXInventoryEntry* MergeTarget = nullptr;
+	for (const FProjectEXInventoryEntry& Other : Entries)
+	{
+		if (Other.EntryId == EntryId || !Other.Definition || Other.Quantity <= 0)
+		{
+			continue;
+		}
+
+		const FIntPoint OtherSize = Other.Definition->GetGridSize(Other.bRotated);
+		if (!RectsOverlap(GridX, GridY, Size.X, Size.Y, Other.GridX, Other.GridY, OtherSize.X, OtherSize.Y))
+		{
+			continue;
+		}
+
+		const int32 MaxStack = FMath::Max(1, Other.Definition->MaxStackSize);
+		if (MergeTarget || Other.Definition != Source->Definition || Other.Quantity >= MaxStack)
+		{
+			return false;
+		}
+
+		MergeTarget = &Other;
+	}
+
+	if (MergeTarget)
+	{
+		OutMergeEntryId = MergeTarget->EntryId;
+	}
+
+	return true;
+}
+
+bool UProjectEXInventoryComponent::FindFreePosition(const TArray<uint8>& Occupied, const UProjectEXItemDefinition* Definition, int32& OutX, int32& OutY, bool& bOutRotated) const
+{
+	if (!Definition)
+	{
+		return false;
+	}
+
+	const int32 Columns = GetGridColumns();
+	const int32 Rows = GetGridRows();
+	const FIntPoint Upright = Definition->GetGridSize(false);
+	const FIntPoint Turned = Definition->GetGridSize(true);
+
+	auto Search = [&](const FIntPoint& Size, bool bRotated) -> bool
+	{
+		for (int32 Y = 0; Y <= Rows - Size.Y; ++Y)
+		{
+			for (int32 X = 0; X <= Columns - Size.X; ++X)
+			{
+				if (RectIsFree(Occupied, X, Y, Size.X, Size.Y))
+				{
+					OutX = X;
+					OutY = Y;
+					bOutRotated = bRotated;
+					return true;
+				}
+			}
+		}
+
+		return false;
+	};
+
+	if (Search(Upright, false))
+	{
+		return true;
+	}
+
+	return Turned != Upright && Search(Turned, true);
+}
+
+void UProjectEXInventoryComponent::MarkOccupied(TArray<uint8>& Occupied, int32 X, int32 Y, int32 Width, int32 Height) const
+{
+	const int32 Columns = GetGridColumns();
+	const int32 Rows = GetGridRows();
+	for (int32 DY = 0; DY < Height; ++DY)
+	{
+		for (int32 DX = 0; DX < Width; ++DX)
+		{
+			const int32 CellX = X + DX;
+			const int32 CellY = Y + DY;
+			if (CellX < 0 || CellY < 0 || CellX >= Columns || CellY >= Rows)
+			{
+				continue;
+			}
+
+			Occupied[CellY * Columns + CellX] = 1;
+		}
+	}
+}
+
+bool UProjectEXInventoryComponent::RectIsFree(const TArray<uint8>& Occupied, int32 X, int32 Y, int32 Width, int32 Height) const
+{
+	const int32 Columns = GetGridColumns();
+	const int32 Rows = GetGridRows();
+	if (X < 0 || Y < 0 || Width <= 0 || Height <= 0 || X + Width > Columns || Y + Height > Rows)
+	{
+		return false;
+	}
+
+	for (int32 DY = 0; DY < Height; ++DY)
+	{
+		for (int32 DX = 0; DX < Width; ++DX)
+		{
+			if (Occupied[(Y + DY) * Columns + (X + DX)] != 0)
+			{
+				return false;
+			}
+		}
+	}
+
+	return true;
+}
+
+void UProjectEXInventoryComponent::HandleRotateItem()
+{
+	if (!bInventoryOpen || !IsLocalOwner() || !InventoryWidget)
 	{
 		return;
 	}
 
-	ToggleInventoryAction = NewObject<UInputAction>(this, TEXT("IA_ToggleInventory"));
-	ToggleInventoryAction->ValueType = EInputActionValueType::Boolean;
+	InventoryWidget->RotateDraggedItem();
+}
 
-	ToggleMappingContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Inventory"));
-	ToggleMappingContext->MapKey(ToggleInventoryAction, ToggleInventoryKey);
+void UProjectEXInventoryComponent::EnsureInputActions()
+{
+	if (!InventoryMappingContext)
+	{
+		InventoryMappingContext = NewObject<UInputMappingContext>(this, TEXT("IMC_Inventory"));
+	}
+
+	if (!ToggleInventoryAction)
+	{
+		ToggleInventoryAction = NewObject<UInputAction>(this, TEXT("IA_ToggleInventory"));
+		ToggleInventoryAction->ValueType = EInputActionValueType::Boolean;
+		InventoryMappingContext->MapKey(ToggleInventoryAction, ToggleInventoryKey);
+	}
+
+	if (!RotateItemAction)
+	{
+		RotateItemAction = NewObject<UInputAction>(this, TEXT("IA_RotateItem"));
+		RotateItemAction->ValueType = EInputActionValueType::Boolean;
+		InventoryMappingContext->MapKey(RotateItemAction, RotateItemKey);
+	}
 }
 
 void UProjectEXInventoryComponent::RegisterMappingContext(const APawn* Pawn)
 {
-	if (bRegisteredMappingContext || !ToggleMappingContext || !Pawn)
+	if (bRegisteredMappingContext || !InventoryMappingContext || !Pawn)
 	{
 		return;
 	}
@@ -365,7 +736,7 @@ void UProjectEXInventoryComponent::RegisterMappingContext(const APawn* Pawn)
 
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LocalPlayer->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
 	{
-		Subsystem->AddMappingContext(ToggleMappingContext, 0);
+		Subsystem->AddMappingContext(InventoryMappingContext, 0);
 		bRegisteredMappingContext = true;
 	}
 }

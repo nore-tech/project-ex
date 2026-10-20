@@ -122,18 +122,10 @@ void AProjectEXPickup::Interact_Implementation(APawn* Interactor)
 
 	bCollected = true;
 	const int32 Added = Inventory->AddItem(ItemDefinition, Quantity);
-	if (Added <= 0)
+	if (Added != Quantity)
 	{
 		bCollected = false;
-		UE_LOG(LogProjectEX, Log, TEXT("%s could not collect %s. No inventory space was available."), *GetNameSafe(Interactor), *GetNameSafe(ItemDefinition));
-		return;
-	}
-
-	Quantity -= Added;
-	if (Quantity > 0)
-	{
-		bCollected = false;
-		ForceNetUpdate();
+		UE_LOG(LogProjectEX, Log, TEXT("%s could not collect %s. The inventory did not have room for the full stack, so the pickup was left unchanged."), *GetNameSafe(Interactor), *GetNameSafe(ItemDefinition));
 		return;
 	}
 
