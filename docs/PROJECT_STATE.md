@@ -38,14 +38,22 @@ Code exists. Gameplay beyond the list above was not verified in that session:
 - `OnWeaponReloaded` runs on the server after ammo is consumed. A remote client does not receive that cosmetic event.
 - Drag, rotate, shift-click, ctrl-click, right-click, and container search were not retested in the 2026-10-20 session.
 
+## Enemy (Milestone 1)
+
+- `AProjectEXEnemy` (`Combat/ProjectEXEnemy.h/.cpp`): ACharacter with `UProjectEXHealthComponent`, Synty dummy mesh plus `ThirdPerson_AnimBP`, and a "HOSTILE <hp>" text label. Settings: MaxHealth, MoveSpeed, DetectionRange, AttackRange, AttackDamage, AttackCooldown, PatrolRadius, CorpseLifetime. Its capsule blocks Visibility so player hitscan registers. On death: movement disabled, controller unpossessed, ragdoll (or tip-over without a physics asset), label "DEAD", destroyed after CorpseLifetime.
+- `AProjectEXEnemyController` (`Combat/ProjectEXEnemyController.h/.cpp`): AIPerception sight plus close-range detection, MoveTo chase, melee damage on the server when in range with line of sight and the cooldown is ready, idle wander otherwise.
+- The level has no NavMesh. Movement falls back to MoveTo without pathfinding, then direct steering.
+- `EX_Enemy_01` is placed in Lvl_FirstPerson at (1000, 0, 302) by `Tools/place_enemy.py`.
+- Verified in game 2026-10-20: the enemy chases and damages the player (health fell 100 → 10). Not observed: enemy death from player fire.
+
 ## Focus
 
-Core player movement and interactions. Do not start extraction, AI, traders, or new equipment slots unless asked.
+Core player movement and interactions, plus the Milestone 1 enemy.
 
 ## Latest work
 
-Blueprint subclassing and cosmetic events on existing classes. Persistent docs: `docs/PROJECT_STATE.md`, `docs/DECISIONS.md`, `docs/CODEBASE_MAP.md`, `docs/BLUEPRINT_SETUP.md`.
+Milestone 1 enemy (see above).
 
 ## Next task
 
-In the editor, create `BP_Rifle`, `BP_Pistol`, and `BP_LootContainer` using `docs/BLUEPRINT_SETUP.md`. Confirm the existing Synty meshes and first-person offsets on those assets. Do not change the test level unless asked.
+Verify in PIE that shooting `EX_Enemy_01` kills it and that its ragdoll or tip-over is visible. Optionally add a NavMeshBoundsVolume for pathed chasing around obstacles.
