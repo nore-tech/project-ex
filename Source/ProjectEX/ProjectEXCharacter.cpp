@@ -10,6 +10,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "ProjectEX.h"
 #include "ProjectEXInteractionComponent.h"
+#include "ProjectEXInventoryComponent.h"
 
 AProjectEXCharacter::AProjectEXCharacter()
 {
@@ -35,6 +36,7 @@ AProjectEXCharacter::AProjectEXCharacter()
 	FirstPersonCameraComponent->FirstPersonScale = 0.6f;
 
 	InteractionComponent = CreateDefaultSubobject<UProjectEXInteractionComponent>(TEXT("Interaction"));
+	InventoryComponent = CreateDefaultSubobject<UProjectEXInventoryComponent>(TEXT("Inventory"));
 
 	// configure the character comps
 	GetMesh()->SetOwnerNoSee(true);
@@ -66,6 +68,11 @@ void AProjectEXCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 		if (InteractionComponent)
 		{
 			InteractionComponent->BindInput(EnhancedInputComponent);
+		}
+
+		if (InventoryComponent)
+		{
+			InventoryComponent->BindInput(EnhancedInputComponent);
 		}
 	}
 	else

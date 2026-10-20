@@ -27,6 +27,7 @@ public class ProjectEX : ModuleRules
 		PublicIncludePaths.AddRange(new string[] {
 			"ProjectEX",
 			"ProjectEX/Interaction",
+			"ProjectEX/Inventory",
 			"ProjectEX/Variant_Horror",
 			"ProjectEX/Variant_Horror/UI",
 			"ProjectEX/Variant_Shooter",

@@ -12,6 +12,7 @@ class USkeletalMeshComponent;
 class UCameraComponent;
 class UInputAction;
 class UProjectEXInteractionComponent;
+class UProjectEXInventoryComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -35,6 +36,10 @@ class AProjectEXCharacter : public ACharacter
 	/** Look-trace interaction. Does not affect movement or camera. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UProjectEXInteractionComponent> InteractionComponent;
+
+	/** Per-player inventory. Does not affect movement or camera. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UProjectEXInventoryComponent> InventoryComponent;
 
 protected:
 
@@ -97,6 +102,9 @@ public:
 
 	/** Returns the interaction component **/
 	UProjectEXInteractionComponent* GetInteractionComponent() const { return InteractionComponent; }
+
+	/** Returns the inventory component **/
+	UProjectEXInventoryComponent* GetInventoryComponent() const { return InventoryComponent; }
 
 };
 
