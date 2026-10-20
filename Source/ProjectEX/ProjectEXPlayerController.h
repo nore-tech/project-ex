@@ -8,6 +8,16 @@
 
 class UInputMappingContext;
 class UUserWidget;
+class UProjectEXRaidWidget;
+
+UENUM(BlueprintType)
+enum class EProjectEXRaidStatus : uint8
+{
+	Preparing,
+	InRaid,
+	Extracted,
+	Dead
+};
 
 /**
  *  Simple first person Player Controller
@@ -24,7 +34,93 @@ public:
 	/** Constructor */
 	AProjectEXPlayerController();
 
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+
+	UFUNCTION(BlueprintPure, Category="Raid")
+	EProjectEXRaidStatus GetRaidStatus() const { return RaidStatus; }
+
+	UFUNCTION(BlueprintPure, Category="Raid")
+	bool IsInRaid() const { return RaidStatus == EProjectEXRaidStatus::InRaid; }
+
+	/** Whole seconds left on the active extraction, or -1 when not extracting. */
+	UFUNCTION(BlueprintPure, Category="Raid")
+	int32 GetExtractionSecondsLeft() const { return ExtractionSecondsLeft; }
+
+	UFUNCTION(BlueprintPure, Category="Raid")
+	FText GetExtractionName() const { return ExtractionName; }
+
+	UFUNCTION(BlueprintPure, Category="Raid")
+	int32 GetRaidKills() const { return RaidKills; }
+
+	UFUNCTION(BlueprintPure, Category="Raid")
+	float GetRaidDuration() const { return RaidDuration; }
+
+	/** Server only. */
+	void SetExtractionProgress(int32 SecondsLeft, const FText& ZoneName);
+
+	/** Server only. Ends the raid as a success. Ignored unless in raid. */
+	void CompleteExtraction(const FText& ZoneName);
+
+	/** Server only. */
+	void AddRaidKill();
+
+	/** Reloads the encounter. Standalone reloads immediately; a listen server waits until nobody is still in raid. */
+	UFUNCTION(BlueprintCallable, Category="Raid")
+	void RequestDeployAgain();
+
+	/** Development testing: moves the pawn to X Y on the arena floor. Standalone only. */
+	UFUNCTION(Exec)
+	void RaidTeleport(float X, float Y);
+
+	/** Cosmetic. Runs on the owning client when the raid status changes. */
+	UFUNCTION(BlueprintImplementableEvent, Category="Raid")
+	void OnRaidStatusChanged(EProjectEXRaidStatus NewStatus);
+
 protected:
+
+	virtual void OnPossess(APawn* InPawn) override;
+
+	/** Seconds in Preparing before enemies engage and extraction opens. */
+	UPROPERTY(EditAnywhere, Category="Raid", meta=(ClampMin="0.0", Units="s"))
+	float DeployDelay = 3.0f;
+
+	/** Raid HUD. Defaults to the native widget; a Blueprint subclass can replace it. */
+	UPROPERTY(EditAnywhere, Category="Raid")
+	TSubclassOf<UProjectEXRaidWidget> RaidWidgetClass;
+
+	UPROPERTY(ReplicatedUsing=OnRep_RaidStatus)
+	EProjectEXRaidStatus RaidStatus = EProjectEXRaidStatus::Preparing;
+
+	UPROPERTY(Replicated)
+	int32 ExtractionSecondsLeft = -1;
+
+	UPROPERTY(Replicated)
+	FText ExtractionName;
+
+	UPROPERTY(Replicated)
+	int32 RaidKills = 0;
+
+	UPROPERTY(Replicated)
+	float RaidDuration = 0.0f;
+
+	UFUNCTION()
+	void OnRep_RaidStatus();
+
+	UFUNCTION(Server, Reliable)
+	void ServerDeployAgain();
+
+	UFUNCTION()
+	void HandlePawnDied(AController* InstigatorController);
+
+	void BeginRaid();
+	void SetRaidStatus(EProjectEXRaidStatus NewStatus);
+	void ApplyLocalRaidStatus();
+
+	UPROPERTY(Transient)
+	TObjectPtr<UProjectEXRaidWidget> RaidWidget;
+
+	FTimerHandle DeployTimer;
+	float RaidStartTime = 0.0f;
 
 	/** Input Mapping Contexts */
 	UPROPERTY(EditAnywhere, Category="Input|Input Mappings")

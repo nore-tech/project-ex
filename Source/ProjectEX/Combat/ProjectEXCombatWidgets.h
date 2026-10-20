@@ -18,6 +18,9 @@ public:
 
 	void BindWeapon(UProjectEXWeaponComponent* InWeapon);
 
+	/** Brief crosshair marker. Red when the hit killed the target. */
+	void ShowHitMarker(bool bKilled);
+
 protected:
 
 	virtual TSharedRef<SWidget> RebuildWidget() override;
@@ -31,4 +34,12 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> StatusText;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> Crosshair;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> HitMarker;
+
+	float HitMarkerTime = 0.0f;
 };

@@ -56,6 +56,17 @@ Authority: the server mutates inventory, equipment, container contents, health, 
   Interact calls `RestoreFullHealth`.
 - `AProjectEXDamagePad` — `Source/ProjectEX/Combat/ProjectEXDamagePad.h`
 
+## Enemies and raid
+
+- `AProjectEXEnemy`, `AProjectEXEnemyController` — `Source/ProjectEX/Combat/`
+  Combat settings, `PatrolPoints`, perception sight, navmesh chase, melee with line of sight. Blueprint: `BP_Enemy`.
+- `EProjectEXRaidStatus` and raid state — `AProjectEXPlayerController` (`Source/ProjectEX/ProjectEXPlayerController.h`)
+  `GetRaidStatus`, `IsInRaid`, `SetExtractionProgress`, `CompleteExtraction`, `AddRaidKill`, `RequestDeployAgain`. Event: `OnRaidStatusChanged`.
+- `AProjectEXExtractionZone` — `Source/ProjectEX/Raid/ProjectEXExtractionZone.h`
+  `DisplayName`, `Radius`, `Countdown`, `ZoneColor`. Event: `OnPlayerExtracted`. Blueprint: `BP_ExtractionZone`.
+- `UProjectEXRaidWidget` — `Source/ProjectEX/Raid/ProjectEXRaidWidget.h`
+  Banner, countdown, damage flash, result panel. Set by `RaidWidgetClass` on the player controller.
+
 ## Blueprint base classes
 
 `UProjectEXWeaponData`, `UProjectEXWeaponItemDefinition`, `UProjectEXItemDefinition`, `AProjectEXPickup`, `AProjectEXLootContainer`, `AProjectEXTargetDummy`, `AProjectEXCharacter`, `UProjectEXWeaponComponent`.

@@ -37,6 +37,8 @@ public:
 	float GetDetectionRange() const { return DetectionRange; }
 	float GetAttackRange() const { return AttackRange; }
 	float GetPatrolRadius() const { return PatrolRadius; }
+	int32 GetPatrolPointCount() const { return PatrolPoints.Num(); }
+	FVector GetPatrolPointWorld(int32 Index) const;
 
 	/** Cosmetic only. Runs on every machine when an attack lands. */
 	UFUNCTION(BlueprintImplementableEvent, Category="Enemy")
@@ -61,18 +63,22 @@ protected:
 	float MoveSpeed = 380.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy", meta=(ClampMin="100.0", Units="cm"))
-	float DetectionRange = 1500.0f;
+	float DetectionRange = 1000.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy", meta=(ClampMin="50.0", Units="cm"))
 	float AttackRange = 170.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy", meta=(ClampMin="0.0"))
-	float AttackDamage = 10.0f;
+	float AttackDamage = 8.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy", meta=(ClampMin="0.1", Units="s"))
-	float AttackCooldown = 1.2f;
+	float AttackCooldown = 1.5f;
 
-	/** Wander distance from the spawn point while no player is detected. Zero stands still. */
+	/** Patrol route relative to the enemy, visited in order. Empty falls back to wandering within PatrolRadius. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy", meta=(MakeEditWidget="true"))
+	TArray<FVector> PatrolPoints;
+
+	/** Wander distance from the spawn point while no player is detected and no patrol route is set. Zero stands still. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Enemy", meta=(ClampMin="0.0", Units="cm"))
 	float PatrolRadius = 500.0f;
 
@@ -97,5 +103,7 @@ private:
 	TWeakObjectPtr<AActor> DirectChaseTarget;
 	float NextAttackTime = 0.0f;
 	float AttackFlashUntil = 0.0f;
+	float LastKnownHealth = -1.0f;
 	bool bDeathHandled = false;
+	FTransform SpawnTransform;
 };

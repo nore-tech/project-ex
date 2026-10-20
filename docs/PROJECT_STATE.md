@@ -38,22 +38,37 @@ Code exists. Gameplay beyond the list above was not verified in that session:
 - `OnWeaponReloaded` runs on the server after ammo is consumed. A remote client does not receive that cosmetic event.
 - Drag, rotate, shift-click, ctrl-click, right-click, and container search were not retested in the 2026-10-20 session.
 
+## Raid loop (Milestone 2)
+
+- Raid status lives on `AProjectEXPlayerController` (replicated): Preparing (3 s `DeployDelay`) → InRaid → Extracted or Dead. Enemies only target InRaid players. Kills, raid time, and extraction countdown replicate to the owner.
+- `AProjectEXExtractionZone` (`Raid/`): server-timed countdown (default 10 s), radius, display name, color. Leaving cancels; re-entering restarts; dead players cannot extract; completion only from InRaid.
+- `UProjectEXRaidWidget` (`Raid/`, native UMG): DEPLOYING banner, extraction countdown, red damage flash, EXTRACTED / KILLED IN ACTION panel with Deploy Again. Deploy Again reloads the level (standalone `OpenLevel`; listen server `ServerTravel` once nobody is in raid), so enemies, zones, and timers reset with no duplicates.
+- Combat HUD: center crosshair plus hit marker (white hit, red kill) through `ClientConfirmHit`. Enemy label flashes white when hit.
+- Enemies: `PatrolPoints` (relative, edit widgets), RVO avoidance, kill credit. Defaults: detection 1000, damage 8, cooldown 1.5.
+- Navigation: `RuntimeGeneration=Dynamic` in DefaultEngine.ini plus `EX_Raid_NavBounds`. Verified the navmesh generates in game.
+- Blueprints: `/Game/ProjectEX/Blueprints/BP_Enemy`, `BP_ExtractionZone`.
+- Level (`Tools/setup_raid_encounter.py`, re-runnable): `EX_Raid_Enemy_A/B/C`, `EX_Raid_Extraction` at (-1000, -1000) "Southwest Exfil", `EX_Raid_NavBounds`, 5 Synty cover props. `EX_Enemy_01` was removed.
+- Dev console: `RaidTeleport X Y` (standalone, non-shipping).
+- Verified in game 2026-10-20: navmesh, patrol, detection, damage from several enemies, countdown start/cancel/restart, extraction success screen, death failure screen, Deploy Again after both, enemies stop after the player dies or extracts.
+- Not verified this session: killing enemies with the rifle, hit marker, enemy ragdoll, listen-server play.
+- Known: on the result screen the keyboard needs two presses (first focuses the button); a mouse click is the normal path.
+
 ## Enemy (Milestone 1)
 
 - `AProjectEXEnemy` (`Combat/ProjectEXEnemy.h/.cpp`): ACharacter with `UProjectEXHealthComponent`, Synty dummy mesh plus `ThirdPerson_AnimBP`, and a "HOSTILE <hp>" text label. Settings: MaxHealth, MoveSpeed, DetectionRange, AttackRange, AttackDamage, AttackCooldown, PatrolRadius, CorpseLifetime. Its capsule blocks Visibility so player hitscan registers. On death: movement disabled, controller unpossessed, ragdoll (or tip-over without a physics asset), label "DEAD", destroyed after CorpseLifetime.
 - `AProjectEXEnemyController` (`Combat/ProjectEXEnemyController.h/.cpp`): AIPerception sight plus close-range detection, MoveTo chase, melee damage on the server when in range with line of sight and the cooldown is ready, idle wander otherwise.
 - The level has no NavMesh. Movement falls back to MoveTo without pathfinding, then direct steering.
-- `EX_Enemy_01` is placed in Lvl_FirstPerson at (1000, 0, 302) by `Tools/place_enemy.py`.
+- `EX_Enemy_01` was replaced by the Milestone 2 encounter. `Tools/place_enemy.py` is superseded by `Tools/setup_raid_encounter.py`.
 - Verified in game 2026-10-20: the enemy chases and damages the player (health fell 100 → 10). Not observed: enemy death from player fire.
 
 ## Focus
 
-Core player movement and interactions, plus the Milestone 1 enemy.
+Playable raid loop: deploy, fight, extract or die, deploy again.
 
 ## Latest work
 
-Milestone 1 enemy (see above).
+Milestone 2 raid loop (see above).
 
 ## Next task
 
-Verify in PIE that shooting `EX_Enemy_01` kills it and that its ragdoll or tip-over is visible. Optionally add a NavMeshBoundsVolume for pathed chasing around obstacles.
+Play a full raid by hand: kill all three enemies with the rifle, confirm the hit marker and enemy death visuals, then extract. Tune enemy damage and detection from `BP_Enemy` if needed.

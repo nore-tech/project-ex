@@ -494,7 +494,11 @@ void UProjectEXWeaponComponent::ServerFire_Implementation()
 					Spec.bHeadshot = bHeadshot;
 					Spec.HitBone = Hit.BoneName;
 					Spec.DamageType = EquippedWeapon->AmmoType ? EquippedWeapon->AmmoType->GetItemId() : NAME_None;
-					Health->ApplyDamage(Spec, Pawn->GetController());
+					const bool bWasAlive = !Health->IsDead();
+					if (Health->ApplyDamage(Spec, Pawn->GetController()) > 0.0f || (bWasAlive && Health->IsDead()))
+					{
+						ClientConfirmHit(Health->IsDead());
+					}
 				}
 			}
 		}
@@ -502,6 +506,14 @@ void UProjectEXWeaponComponent::ServerFire_Implementation()
 
 	const FVector ImpactPoint = bHit ? Hit.ImpactPoint : TraceEnd;
 	MulticastFireFX(TraceStart, ImpactPoint);
+}
+
+void UProjectEXWeaponComponent::ClientConfirmHit_Implementation(bool bKilled)
+{
+	if (HudWidget)
+	{
+		HudWidget->ShowHitMarker(bKilled);
+	}
 }
 
 void UProjectEXWeaponComponent::ServerReload_Implementation()

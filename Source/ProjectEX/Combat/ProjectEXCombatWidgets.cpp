@@ -36,6 +36,27 @@ TSharedRef<SWidget> UProjectEXCombatHudWidget::RebuildWidget()
 			TextSlot->SetAutoSize(true);
 			TextSlot->SetPosition(FVector2D(28.0f, -28.0f));
 		}
+
+		auto AddCentered = [this, Canvas](const TCHAR* Glyph, int32 Size, const FLinearColor& Color)
+		{
+			UTextBlock* Text = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass());
+			Text->SetFont(FCoreStyle::GetDefaultFontStyle(TEXT("Bold"), Size));
+			Text->SetColorAndOpacity(FSlateColor(Color));
+			Text->SetText(FText::FromString(Glyph));
+			Text->SetVisibility(ESlateVisibility::HitTestInvisible);
+			Canvas->AddChild(Text);
+			if (UCanvasPanelSlot* CenterSlot = Cast<UCanvasPanelSlot>(Text->Slot))
+			{
+				CenterSlot->SetAnchors(FAnchors(0.5f, 0.5f, 0.5f, 0.5f));
+				CenterSlot->SetAlignment(FVector2D(0.5f, 0.5f));
+				CenterSlot->SetAutoSize(true);
+			}
+			return Text;
+		};
+
+		Crosshair = AddCentered(TEXT("+"), 14, FLinearColor(1.0f, 1.0f, 1.0f, 0.6f));
+		HitMarker = AddCentered(TEXT("X"), 22, FLinearColor::White);
+		HitMarker->SetRenderOpacity(0.0f);
 	}
 
 	return Super::RebuildWidget();
@@ -45,6 +66,23 @@ void UProjectEXCombatHudWidget::NativeTick(const FGeometry& MyGeometry, float In
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 	Refresh();
+
+	if (HitMarker && HitMarkerTime > 0.0f)
+	{
+		HitMarkerTime = FMath::Max(0.0f, HitMarkerTime - InDeltaTime);
+		HitMarker->SetRenderOpacity(FMath::Clamp(HitMarkerTime / 0.25f, 0.0f, 1.0f));
+	}
+}
+
+void UProjectEXCombatHudWidget::ShowHitMarker(bool bKilled)
+{
+	if (!HitMarker)
+	{
+		return;
+	}
+	HitMarker->SetColorAndOpacity(FSlateColor(bKilled ? FLinearColor(1.0f, 0.2f, 0.15f) : FLinearColor::White));
+	HitMarkerTime = bKilled ? 0.6f : 0.25f;
+	HitMarker->SetRenderOpacity(1.0f);
 }
 
 void UProjectEXCombatHudWidget::Refresh()

@@ -9,6 +9,8 @@
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "ProjectEXEnemyController.h"
 #include "ProjectEXHealthComponent.h"
+#include "ProjectEXPlayerController.h"
+#include "ProjectEX.h"
 
 namespace
 {
@@ -46,6 +48,8 @@ AProjectEXEnemy::AProjectEXEnemy()
 	GetCharacterMovement()->bUseControllerDesiredRotation = true;
 	GetCharacterMovement()->RotationRate = FRotator(0.0f, 540.0f, 0.0f);
 	GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
+	GetCharacterMovement()->bUseRVOAvoidance = true;
+	GetCharacterMovement()->AvoidanceConsiderationRadius = 300.0f;
 
 	AIControllerClass = AProjectEXEnemyController::StaticClass();
 	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
@@ -54,6 +58,7 @@ AProjectEXEnemy::AProjectEXEnemy()
 void AProjectEXEnemy::BeginPlay()
 {
 	ApplyEnemyMesh();
+	SpawnTransform = GetActorTransform();
 	Super::BeginPlay();
 
 	GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
@@ -111,6 +116,11 @@ void AProjectEXEnemy::Tick(float DeltaSeconds)
 bool AProjectEXEnemy::IsDead() const
 {
 	return Health && Health->IsDead();
+}
+
+FVector AProjectEXEnemy::GetPatrolPointWorld(int32 Index) const
+{
+	return PatrolPoints.IsValidIndex(Index) ? SpawnTransform.TransformPosition(PatrolPoints[Index]) : SpawnTransform.GetLocation();
 }
 
 bool AProjectEXEnemy::TryAttack(APawn* Target)
@@ -188,6 +198,11 @@ void AProjectEXEnemy::HandleDied(AController* InstigatorController)
 
 	if (HasAuthority())
 	{
+		UE_LOG(LogProjectEX, Log, TEXT("Enemy %s died (killer %s)"), *GetActorNameOrLabel(), *GetNameSafe(InstigatorController));
+		if (AProjectEXPlayerController* Killer = Cast<AProjectEXPlayerController>(InstigatorController))
+		{
+			Killer->AddRaidKill();
+		}
 		if (AController* AIController = GetController())
 		{
 			AIController->StopMovement();
@@ -205,6 +220,12 @@ void AProjectEXEnemy::HandleDied(AController* InstigatorController)
 
 void AProjectEXEnemy::HandleHealthChanged(float NewHealth, float NewMaxHealth)
 {
+	if (StatusText && LastKnownHealth >= 0.0f && NewHealth < LastKnownHealth && NewHealth > 0.0f)
+	{
+		StatusText->SetTextRenderColor(FColor::White);
+		AttackFlashUntil = GetWorld()->GetTimeSeconds() + 0.12f;
+	}
+	LastKnownHealth = NewHealth;
 	UpdateStatusText();
 }
 

@@ -47,4 +47,5 @@ private:
 	TWeakObjectPtr<APawn> CurrentTarget;
 	FVector HomeLocation = FVector::ZeroVector;
 	float NextWanderTime = 0.0f;
+	int32 PatrolIndex = 0;
 };

@@ -31,6 +31,7 @@ public class ProjectEX : ModuleRules
 			"ProjectEX/Interaction",
 			"ProjectEX/Inventory",
 			"ProjectEX/Combat",
+			"ProjectEX/Raid",
 			"ProjectEX/Variant_Horror",
 			"ProjectEX/Variant_Horror/UI",
 			"ProjectEX/Variant_Shooter",

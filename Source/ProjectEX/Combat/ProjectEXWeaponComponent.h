@@ -85,6 +85,10 @@ protected:
 	UFUNCTION(Client, Reliable)
 	void ClientSetReloading(bool bNewReloading);
 
+	/** Hit marker for the shooter. */
+	UFUNCTION(Client, Unreliable)
+	void ClientConfirmHit(bool bKilled);
+
 	UFUNCTION()
 	void OnRep_EquippedWeapon();
 

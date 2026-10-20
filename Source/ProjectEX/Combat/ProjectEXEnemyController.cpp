@@ -7,6 +7,8 @@
 #include "Perception/AISense_Sight.h"
 #include "ProjectEXEnemy.h"
 #include "ProjectEXHealthComponent.h"
+#include "ProjectEXPlayerController.h"
+#include "ProjectEX.h"
 #include "TimerManager.h"
 
 AProjectEXEnemyController::AProjectEXEnemyController()
@@ -85,6 +87,13 @@ bool AProjectEXEnemyController::IsValidTarget(const APawn* Pawn)
 	{
 		return false;
 	}
+	if (const AProjectEXPlayerController* RaidController = Cast<AProjectEXPlayerController>(Pawn->GetController()))
+	{
+		if (!RaidController->IsInRaid())
+		{
+			return false;
+		}
+	}
 	const UProjectEXHealthComponent* TargetHealth = Pawn->FindComponentByClass<UProjectEXHealthComponent>();
 	return TargetHealth && !TargetHealth->IsDead();
 }
@@ -156,10 +165,12 @@ void AProjectEXEnemyController::ChaseTarget(AProjectEXEnemy* Enemy, APawn* Targe
 		return;
 	}
 
-	const float Acceptance = AttackRange * 0.6f;
+	// In range without line of sight: close in further so the enemy steps around the blocker.
+	const float Acceptance = bInRange ? 30.0f : AttackRange * 0.6f;
 	EPathFollowingRequestResult::Type Result = MoveToActor(Target, Acceptance, false, true, true, nullptr, true);
 	if (Result == EPathFollowingRequestResult::Failed)
 	{
+		UE_LOG(LogProjectEX, Verbose, TEXT("%s: no navmesh path to %s, moving directly"), *GetNameSafe(Enemy), *GetNameSafe(Target));
 		Result = MoveToActor(Target, Acceptance, false, false, true, nullptr, true);
 	}
 	Enemy->SetDirectChaseTarget(Result == EPathFollowingRequestResult::Failed ? Target : nullptr);
@@ -168,16 +179,26 @@ void AProjectEXEnemyController::ChaseTarget(AProjectEXEnemy* Enemy, APawn* Targe
 void AProjectEXEnemyController::Wander(AProjectEXEnemy* Enemy)
 {
 	const float Radius = Enemy->GetPatrolRadius();
+	const int32 PointCount = Enemy->GetPatrolPointCount();
 	const float Now = GetWorld()->GetTimeSeconds();
-	if (Radius <= 0.0f || GetMoveStatus() == EPathFollowingStatus::Moving || Now < NextWanderTime)
+	if ((PointCount == 0 && Radius <= 0.0f) || GetMoveStatus() == EPathFollowingStatus::Moving || Now < NextWanderTime)
 	{
 		return;
 	}
 
-	NextWanderTime = Now + FMath::FRandRange(2.0f, 4.0f);
+	NextWanderTime = Now + FMath::FRandRange(1.5f, 3.0f);
 
-	const FVector2D Offset = FVector2D(FMath::VRand()).GetSafeNormal() * FMath::FRandRange(Radius * 0.3f, Radius);
-	const FVector Destination = HomeLocation + FVector(Offset.X, Offset.Y, 0.0f);
+	FVector Destination;
+	if (PointCount > 0)
+	{
+		Destination = Enemy->GetPatrolPointWorld(PatrolIndex % PointCount);
+		PatrolIndex = (PatrolIndex + 1) % PointCount;
+	}
+	else
+	{
+		const FVector2D Offset = FVector2D(FMath::VRand()).GetSafeNormal() * FMath::FRandRange(Radius * 0.3f, Radius);
+		Destination = HomeLocation + FVector(Offset.X, Offset.Y, 0.0f);
+	}
 	if (MoveToLocation(Destination, 50.0f, true, true) == EPathFollowingRequestResult::Failed)
 	{
 		MoveToLocation(Destination, 50.0f, true, false);
