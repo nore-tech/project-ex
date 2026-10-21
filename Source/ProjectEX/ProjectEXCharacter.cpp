@@ -56,11 +56,16 @@ AProjectEXCharacter::AProjectEXCharacter()
 	GetMesh()->SetOwnerNoSee(true);
 	GetMesh()->FirstPersonPrimitiveType = EFirstPersonPrimitiveType::WorldSpaceRepresentation;
 
-	GetCapsuleComponent()->SetCapsuleSize(34.0f, 96.0f);
+	GetCapsuleComponent()->InitCapsuleSize(34.0f, 96.0f);
 
 	// Configure character movement
 	GetCharacterMovement()->BrakingDecelerationFalling = FallingBrakingDeceleration;
 	GetCharacterMovement()->AirControl = AirControl;
+
+	// Crouching uses the native character crouch, so the nav agent must allow it.
+	GetCharacterMovement()->GetNavAgentPropertiesRef().bCanCrouch = true;
+	GetCharacterMovement()->MaxWalkSpeed = WalkMoveSpeed;
+	GetCharacterMovement()->MaxWalkSpeedCrouched = CrouchMoveSpeed;
 }
 
 void AProjectEXCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -78,6 +83,19 @@ void AProjectEXCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInput
 		// Looking/Aiming
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AProjectEXCharacter::LookInput);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AProjectEXCharacter::LookInput);
+
+		// Sprinting (held)
+		if (SprintInputAction)
+		{
+			EnhancedInputComponent->BindAction(SprintInputAction, ETriggerEvent::Started, this, &AProjectEXCharacter::DoSprintStart);
+			EnhancedInputComponent->BindAction(SprintInputAction, ETriggerEvent::Completed, this, &AProjectEXCharacter::DoSprintEnd);
+		}
+
+		// Crouching (toggled)
+		if (CrouchInputAction)
+		{
+			EnhancedInputComponent->BindAction(CrouchInputAction, ETriggerEvent::Started, this, &AProjectEXCharacter::DoCrouchToggle);
+		}
 
 		if (InteractionComponent)
 		{
@@ -127,9 +145,16 @@ void AProjectEXCharacter::BeginPlay()
 	{
 		Movement->BrakingDecelerationFalling = FallingBrakingDeceleration;
 		Movement->AirControl = AirControl;
+		Movement->MaxWalkSpeed = WalkMoveSpeed;
+		Movement->MaxWalkSpeedCrouched = CrouchMoveSpeed;
 	}
 
-	ApplyPolygonMeshes();
+	// The first person presentation now uses the native First Person template setup that is
+	// already authored on BP_FirstPersonCharacter: SKM_Manny_Simple on the UE5 mannequin
+	// skeleton plus ABP_FP_Copy / ABP_FP_Weapon. The old Synty arms override is intentionally
+	// not applied any more. It swapped in SK_Character_FPS_Arms_01, which sits on
+	// UE4_Mannequin_Skeleton and is therefore incompatible with every first person template
+	// animation, and it also nulled the anim class and hid the mesh.
 	Super::BeginPlay();
 
 	if (HealthComponent)
@@ -171,9 +196,9 @@ void AProjectEXCharacter::DoAim(float Yaw, float Pitch)
 {
 	if (GetController())
 	{
-		// pass the rotation inputs
-		AddControllerYawInput(Yaw);
-		AddControllerPitchInput(Pitch);
+		const float Scale = WeaponComponent ? WeaponComponent->GetAimLookScale() : 1.0f;
+		AddControllerYawInput(Yaw * Scale);
+		AddControllerPitchInput(Pitch * Scale);
 	}
 }
 
@@ -207,4 +232,113 @@ void AProjectEXCharacter::DoJumpEnd()
 {
 	// pass StopJumping to the character
 	StopJumping();
+}
+
+void AProjectEXCharacter::DoSprintStart()
+{
+	if (HealthComponent && HealthComponent->IsDead())
+	{
+		return;
+	}
+
+	bSprintHeld = true;
+
+	// Sprinting cancels ADS, so the weapon drops straight back to hip-fire.
+	if (WeaponComponent && WeaponComponent->IsAiming())
+	{
+		WeaponComponent->CancelAim();
+	}
+
+	UpdateMovementSpeed();
+}
+
+void AProjectEXCharacter::DoSprintEnd()
+{
+	bSprintHeld = false;
+	UpdateMovementSpeed();
+}
+
+void AProjectEXCharacter::DoCrouchToggle()
+{
+	if (HealthComponent && HealthComponent->IsDead())
+	{
+		return;
+	}
+
+	// Native crouch. UnCrouch checks head clearance itself, so standing up under
+	// geometry is refused rather than clipping the player into it.
+	if (bIsCrouched)
+	{
+		UnCrouch();
+	}
+	else
+	{
+		Crouch();
+	}
+}
+
+void AProjectEXCharacter::UpdateMovementSpeed()
+{
+	UCharacterMovementComponent* Movement = GetCharacterMovement();
+	if (!Movement)
+	{
+		return;
+	}
+
+	const bool bAlive = !(HealthComponent && HealthComponent->IsDead());
+	const bool bAiming = WeaponComponent && WeaponComponent->IsAiming();
+
+	// Sprint needs the input held, a live pawn, standing on both feet, and no ADS.
+	// Requiring !bAiming is what makes ADS block sprinting every frame.
+	const bool bSprintActive = bSprintHeld && bAlive && !bIsCrouched && !bAiming;
+
+	Movement->MaxWalkSpeed = bSprintActive ? SprintMoveSpeed : WalkMoveSpeed;
+	Movement->MaxWalkSpeedCrouched = CrouchMoveSpeed;
+}
+
+void AProjectEXCharacter::UpdateCrouchView(float DeltaSeconds)
+{
+	if (!FirstPersonCameraComponent)
+	{
+		return;
+	}
+
+	if (DeltaSeconds > 0.0f)
+	{
+		CrouchViewOffset = FMath::FInterpTo(CrouchViewOffset, 0.0f, DeltaSeconds, CrouchViewInterpSpeed);
+	}
+
+	FirstPersonCameraComponent->SetRelativeLocation(
+		FVector(BaseCameraLocation.X, BaseCameraLocation.Y, BaseCameraLocation.Z + CrouchViewOffset));
+}
+
+void AProjectEXCharacter::OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
+{
+	Super::OnStartCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+
+	// The mesh drops with the capsule, which would snap the socket camera down in one
+	// frame. Raise it by the same amount and let it ease back to zero for a smooth descent.
+	CrouchViewOffset += ScaledHalfHeightAdjust;
+	UpdateCrouchView(0.0f);
+	UpdateMovementSpeed();
+}
+
+void AProjectEXCharacter::OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust)
+{
+	Super::OnEndCrouch(HalfHeightAdjust, ScaledHalfHeightAdjust);
+
+	CrouchViewOffset -= ScaledHalfHeightAdjust;
+	UpdateCrouchView(0.0f);
+	UpdateMovementSpeed();
+}
+
+void AProjectEXCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	UpdateCrouchView(DeltaSeconds);
+
+	// Cheap reconciliation. Catches aiming, death and crouch changes made outside
+	// the movement input path without duplicating the rules in several places.
+	UpdateMovementSpeed();
 }

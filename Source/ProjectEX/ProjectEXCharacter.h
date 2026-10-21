@@ -72,6 +72,14 @@ protected:
 	UPROPERTY(EditAnywhere, Category ="Input")
 	class UInputAction* MouseLookAction;
 
+	/** Sprint Input Action. Held down to sprint. */
+	UPROPERTY(EditAnywhere, Category ="Input")
+	class UInputAction* SprintInputAction;
+
+	/** Crouch Input Action. Pressed to toggle crouch. */
+	UPROPERTY(EditAnywhere, Category ="Input")
+	class UInputAction* CrouchInputAction;
+
 	/** Copied onto CharacterMovement. Existing falling brake. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement", meta=(ClampMin="0.0", AllowPrivateAccess="true"))
 	float FallingBrakingDeceleration = 1500.0f;
@@ -79,9 +87,35 @@ protected:
 	/** Copied onto CharacterMovement. Existing air control. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement", meta=(ClampMin="0.0", ClampMax="1.0", AllowPrivateAccess="true"))
 	float AirControl = 0.5f;
+
+	/** Standing walk speed applied to CharacterMovement. Matches the existing 600 default. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement", meta=(ClampMin="0.0", Units="cm/s", AllowPrivateAccess="true"))
+	float WalkMoveSpeed = 600.0f;
+
+	/** Sprint speed. Roughly 1.5x walking. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement", meta=(ClampMin="0.0", Units="cm/s", AllowPrivateAccess="true"))
+	float SprintMoveSpeed = 900.0f;
+
+	/** Crouched speed. Roughly half of walking. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement", meta=(ClampMin="0.0", Units="cm/s", AllowPrivateAccess="true"))
+	float CrouchMoveSpeed = 300.0f;
+
+	/** How fast the view eases to the crouched eye height. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Movement", meta=(ClampMin="0.1", AllowPrivateAccess="true"))
+	float CrouchViewInterpSpeed = 12.0f;
 	
 public:
 	AProjectEXCharacter();
+
+	/** True while the sprint input is held and sprinting is currently allowed. */
+	UFUNCTION(BlueprintPure, Category="Movement")
+	bool IsSprinting() const { return bSprintHeld; }
+
+	UFUNCTION(BlueprintPure, Category="Movement")
+	float GetSprintSpeed() const { return SprintMoveSpeed; }
+
+	UFUNCTION(BlueprintPure, Category="Movement")
+	float GetCrouchSpeed() const { return CrouchMoveSpeed; }
 
 protected:
 
@@ -107,6 +141,18 @@ protected:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
 
+	/** Handles sprint start inputs from either controls or UI interfaces */
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoSprintStart();
+
+	/** Handles sprint end inputs from either controls or UI interfaces */
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoSprintEnd();
+
+	/** Handles crouch toggle inputs from either controls or UI interfaces */
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoCrouchToggle();
+
 protected:
 
 	void ApplyPolygonMeshes();
@@ -116,6 +162,25 @@ protected:
 
 	UFUNCTION()
 	void HandleDied(AController* InstigatorController);
+
+	/** Keeps CharacterMovement in sync with sprint, crouch, aim and death state. */
+	void UpdateMovementSpeed();
+
+	/** Eases the first-person camera between standing and crouched height. */
+	void UpdateCrouchView(float DeltaSeconds);
+
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void OnStartCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
+	virtual void OnEndCrouch(float HalfHeightAdjust, float ScaledHalfHeightAdjust) override;
+
+	/** Camera location at standing height. Mirrors the constructor value. */
+	FVector BaseCameraLocation = FVector(-2.8f, 5.89f, 0.0f);
+
+	/** Offset added to the camera while a crouch transition eases out. */
+	float CrouchViewOffset = 0.0f;
+
+	/** Sprint input is held. Sprinting also requires standing, alive and not aiming. */
+	bool bSprintHeld = false;
 	
 
 public:

@@ -267,6 +267,16 @@ bool UProjectEXWeaponComponent::IsAiming() const
 	return bAimHeld && EquippedWeapon != nullptr && CanUseWeapon();
 }
 
+float UProjectEXWeaponComponent::GetAimLookScale() const
+{
+	if (!EquippedWeapon || !View)
+	{
+		return 1.0f;
+	}
+
+	return FMath::Lerp(1.0f, EquippedWeapon->AdsLookScale, View->GetAimAlpha());
+}
+
 float UProjectEXWeaponComponent::ConsumeRecoilPitch()
 {
 	const float Value = PendingRecoilPitch;
@@ -334,6 +344,11 @@ void UProjectEXWeaponComponent::AimPressed()
 }
 
 void UProjectEXWeaponComponent::AimReleased()
+{
+	bAimHeld = false;
+}
+
+void UProjectEXWeaponComponent::CancelAim()
 {
 	bAimHeld = false;
 }
@@ -806,23 +821,14 @@ void UProjectEXWeaponComponent::ClearMeshes()
 
 void UProjectEXWeaponComponent::EnsureView()
 {
-	const APawn* Pawn = Cast<APawn>(GetOwner());
-	if (View || !Pawn || !Pawn->IsLocallyControlled())
-	{
-		return;
-	}
-
-	AProjectEXCharacter* Character = Cast<AProjectEXCharacter>(GetOwner());
-	UCameraComponent* Camera = Character ? Character->GetFirstPersonCameraComponent() : nullptr;
-	if (!Character || !Camera)
-	{
-		return;
-	}
-
-	View = NewObject<UProjectEXWeaponViewComponent>(Character);
-	View->SetupAttachment(Camera);
-	View->RegisterComponent();
-	View->SetWeapon(EquippedWeapon);
+	// First person presentation is owned by BP_FirstPersonCharacter, which builds the weapon
+	// viewmodel from native First Person template assets and its own scene components.
+	// Creating the old procedural view here would render a second weapon plus a duplicate
+	// set of arms on top of it, so it stays disabled.
+	//
+	// Nothing gameplay related lives here: equipping, firing, damage, ammunition and reload
+	// are all handled above this call and are unaffected.
+	// Intentionally does nothing. Presentation is fully Blueprint driven now.
 }
 
 void UProjectEXWeaponComponent::PlayPredictedFireFX()

@@ -48,6 +48,13 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category="Enemy")
 	void OnEnemyDied();
 
+	/**
+	 * Cosmetic only. Runs on every machine that sees this enemy take damage.
+	 * bLethal is true on the hit that dropped the enemy to zero health.
+	 */
+	UFUNCTION(BlueprintImplementableEvent, Category="Enemy")
+	void OnEnemyHit(float DamageAmount, bool bLethal);
+
 protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta=(AllowPrivateAccess="true"))
@@ -88,6 +95,10 @@ protected:
 
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastAttack(APawn* Target);
+
+	/** Replays the cosmetic hit reaction on every client that can see this enemy. */
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastHitReaction(float DamageAmount, bool bLethal);
 
 private:
 

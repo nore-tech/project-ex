@@ -45,7 +45,9 @@ Authority: the server mutates inventory, equipment, container contents, health, 
 - `UProjectEXWeaponComponent` — `Source/ProjectEX/Combat/ProjectEXWeaponComponent.h`
   Server fire and reload. Events: `OnWeaponFired`, `OnWeaponReloaded`.
 - `UProjectEXWeaponViewComponent` — `Source/ProjectEX/Combat/ProjectEXWeaponViewComponent.h`
-  Local-only pose. Not Blueprintable.
+  Local-only pose, attached to the first-person camera. Not Blueprintable.
+- `AProjectEXWeaponRig` — `Source/ProjectEX/Combat/ProjectEXWeaponRig.h`
+  Unspawned Blueprint (`BP_EX_Rifle`). `HipFireAnchor` and `ADSAnchor` place the equipped rifle. Set on `UProjectEXWeaponData.PresentationRig`.
 
 ## Health
 

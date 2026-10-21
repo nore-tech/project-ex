@@ -6,6 +6,7 @@
 #include "Engine/DataAsset.h"
 #include "ProjectEXWeaponData.generated.h"
 
+class AProjectEXWeaponRig;
 class UProjectEXItemDefinition;
 class USkeletalMesh;
 class USoundBase;
@@ -114,11 +115,26 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Visual")
 	FVector LeftHandOffset = FVector(7.0f, 14.0f, -6.0f);
 
-	/** World camera field of view while fully aimed. */
-	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Visual", meta=(ClampMin="40.0", ClampMax="120.0", Units="deg"))
-	float AdsFOV = 65.0f;
+	/**
+	 * Blueprint whose HipFireAnchor and ADSAnchor place this weapon on the camera.
+	 * When set, those transforms drive the gun you see. The rig actor is not spawned.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Presentation")
+	TSubclassOf<AProjectEXWeaponRig> PresentationRig;
 
-	/** How quickly hip-fire and aiming blend. Higher is faster. */
+	/** World camera field of view while fully aimed. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Presentation|ADS", meta=(ClampMin="40.0", ClampMax="120.0", Units="deg"))
+	float AdsFOV = 75.0f;
+
+	/** Seconds to move between hip-fire and aimed, in either direction. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Presentation|ADS", meta=(ClampMin="0.01", Units="s"))
+	float AdsTransitionDuration = 0.18f;
+
+	/** Look sensitivity while fully aimed. 1 keeps the hip-fire sensitivity. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Presentation|ADS", meta=(ClampMin="0.05", ClampMax="1.0"))
+	float AdsLookScale = 0.75f;
+
+	/** Unused by the blend. Kept so existing assets still load. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Weapon|Visual", meta=(ClampMin="0.1"))
 	float AdsSpeed = 10.0f;
 

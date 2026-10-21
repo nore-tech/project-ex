@@ -4,6 +4,7 @@
 #include "ProjectEXCharacter.h"
 #include "ProjectEXWeaponComponent.h"
 #include "ProjectEXWeaponData.h"
+#include "ProjectEXWeaponRig.h"
 #include "Camera/CameraComponent.h"
 #include "Components/PoseableMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -114,7 +115,25 @@ namespace
 		FTransform HandTransform = Mesh->GetBoneTransformByName(Hand, EBoneSpaces::ComponentSpace);
 		const FVector Wrist = Contact + (ElbowHint - Contact).GetSafeNormal() * 7.0f;
 		AnimationCore::SolveTwoBoneIK(UpperTransform, LowerTransform, HandTransform, ElbowHint, Wrist, false, 1.0, 1.0);
-		HandTransform.SetRotation(HandRotation);
+
+		// The wrist has to stay welded to its own forearm. Two things were wrong here: an absolute
+		// component-space rotation let the hand swing up to 180 degrees off the lower arm and sheared
+		// the palm into flat shards, and the two-bone solve preserves the rest pose's bone roll, so a
+		// T-posed arm swung forward keeps its palms-down roll and presents the BACK of the hand to the
+		// camera. Split the authored aim into the two axes and treat them differently: twist runs along
+		// the hand's own length axis (pronation/supination, which is safe and is what turns the palm
+		// onto the grip) and is applied in full, while the off-axis swing is what tears the wrist and
+		// so stays clamped.
+		const FQuat ForearmRotation = LowerTransform.GetRotation();
+		const FQuat DesiredLocal = ForearmRotation.Inverse() * HandRotation;
+		FQuat Swing(0.0f, 0.0f, 0.0f, 1.0f);
+		FQuat Twist(0.0f, 0.0f, 0.0f, 1.0f);
+		DesiredLocal.ToSwingTwist(FVector::XAxisVector, Swing, Twist);
+		FVector SwingAxis = FVector::XAxisVector;
+		float SwingAngle = 0.0f;
+		Swing.ToAxisAndAngle(SwingAxis, SwingAngle);
+		const FQuat ClampedSwing(SwingAxis, FMath::Min(SwingAngle, FMath::DegreesToRadians(25.0f)));
+		HandTransform.SetRotation(ForearmRotation * ClampedSwing * Twist);
 		Mesh->SetBoneTransformByName(Upper, UpperTransform, EBoneSpaces::ComponentSpace);
 		Mesh->SetBoneTransformByName(Lower, LowerTransform, EBoneSpaces::ComponentSpace);
 		Mesh->SetBoneTransformByName(Hand, HandTransform, EBoneSpaces::ComponentSpace);
@@ -241,13 +260,14 @@ void UProjectEXWeaponViewComponent::TickComponent(float DeltaTime, ELevelTick Ti
 		return;
 	}
 
-	if (!bHandsPosed)
+	if (!bHandsPosed && !UsesPresentationRig())
 	{
 		PlaceHeldWeapon();
 	}
 
 	const bool bWantAim = WeaponComponent && WeaponComponent->IsAiming();
-	AimAlpha = FMath::FInterpTo(AimAlpha, bWantAim ? 1.0f : 0.0f, DeltaTime, Weapon->AdsSpeed);
+	const float AimRate = 1.0f / FMath::Max(Weapon->AdsTransitionDuration, 0.01f);
+	AimAlpha = FMath::FInterpConstantTo(AimAlpha, bWantAim ? 1.0f : 0.0f, DeltaTime, AimRate);
 
 	const FRotator Look = Pawn->GetControlRotation();
 	FRotator LookDelta = FRotator::ZeroRotator;
@@ -317,7 +337,7 @@ void UProjectEXWeaponViewComponent::TickComponent(float DeltaTime, ELevelTick Ti
 
 	FVector Location = FVector::ZeroVector;
 	FRotator Rotation = FRotator::ZeroRotator;
-	if (bHeldInHands)
+	if (bHeldInHands || UsesPresentationRig())
 	{
 		Location = (BobOffset * BobScale) + KickOffset;
 		Location.Z -= ReloadPose * Weapon->ReloadDropDistance;
@@ -349,11 +369,19 @@ void UProjectEXWeaponViewComponent::TickComponent(float DeltaTime, ELevelTick Ti
 			if (!bCapturedFieldOfView)
 			{
 				RestingFieldOfView = Camera->FieldOfView;
+				RestingFirstPersonFieldOfView = Camera->FirstPersonFieldOfView;
 				bCapturedFieldOfView = true;
 			}
 			Camera->SetFieldOfView(FMath::Lerp(RestingFieldOfView, Weapon->AdsFOV, AimAlpha));
+			// The first-person projection stays at its resting value. Driving it toward AdsFOV
+			// would shrink the gun and hands on screen exactly when they should be filling it.
+			Camera->FirstPersonFieldOfView = RestingFirstPersonFieldOfView;
 
-			if (bHeldInHands && Mesh && AimAlpha > 0.0f)
+			if (UsesPresentationRig())
+			{
+				ApplyRigPose();
+			}
+			else if (bHeldInHands && Mesh && AimAlpha > 0.0f)
 			{
 				UpdateComponentToWorld();
 				Mesh->UpdateComponentToWorld();
@@ -421,6 +449,7 @@ void UProjectEXWeaponViewComponent::EnsureArms()
 		ArmsMesh->AllocateTransformData();
 	}
 
+	ArmsMesh->SetVisibility(true);
 	ArmsMesh->SetRelativeRotation(FRotator::ZeroRotator);
 	ArmsMesh->SetRelativeScale3D(FVector::OneVector);
 	bArmsAligned = false;
@@ -445,6 +474,9 @@ void UProjectEXWeaponViewComponent::UpdateFirstPersonMesh()
 		return;
 	}
 
+	// Every pose grips the weapon with the Synty FPS arms, so they are created whether the
+	// gun placement comes from a presentation rig or from the held-weapon IK below.
+	const bool bRig = UsesPresentationRig();
 	EnsureArms();
 
 	Mesh = NewObject<USkeletalMeshComponent>(Character);
@@ -453,15 +485,99 @@ void UProjectEXWeaponViewComponent::UpdateFirstPersonMesh()
 	Mesh->SetOnlyOwnerSee(true);
 	Mesh->SetCastShadow(false);
 	Mesh->SetFirstPersonPrimitiveType(EFirstPersonPrimitiveType::FirstPerson);
-	Mesh->SetupAttachment(ArmsMesh ? static_cast<USceneComponent*>(ArmsMesh) : static_cast<USceneComponent*>(this));
-	Mesh->SetRelativeScale3D(ArmsMesh ? FVector::OneVector : FVector(Weapon->ViewScale));
+	Mesh->SetupAttachment(bRig || !ArmsMesh ? static_cast<USceneComponent*>(this) : static_cast<USceneComponent*>(ArmsMesh));
+	Mesh->SetRelativeScale3D(bRig || ArmsMesh ? FVector::OneVector : FVector(Weapon->ViewScale));
 	if (!ArmsMesh)
 	{
 		Mesh->SetRelativeRotation(Weapon->ViewRotation);
 		Mesh->SetRelativeLocation(Weapon->ViewOffset);
 	}
 	Mesh->RegisterComponent();
-	PlaceHeldWeapon();
+	if (bRig)
+	{
+		ApplyRigPose();
+	}
+	else
+	{
+		PlaceHeldWeapon();
+	}
+}
+
+bool UProjectEXWeaponViewComponent::UsesPresentationRig() const
+{
+	return Weapon && Weapon->PresentationRig != nullptr;
+}
+
+void UProjectEXWeaponViewComponent::ApplyRigPose()
+{
+	const AProjectEXWeaponRig* Rig = Weapon && Weapon->PresentationRig
+		? Weapon->PresentationRig->GetDefaultObject<AProjectEXWeaponRig>()
+		: nullptr;
+	if (!Rig || !Rig->GetHipFireAnchor() || !Rig->GetADSAnchor() || !Rig->GetPreviewMesh() || !Mesh)
+	{
+		return;
+	}
+
+	const FTransform MeshOnAnchor = Rig->GetPreviewMesh()->GetRelativeTransform();
+	const FTransform Hip = Rig->GetHipFireAnchor()->GetRelativeTransform() * MeshOnAnchor;
+	const FTransform Aim = Rig->GetADSAnchor()->GetRelativeTransform() * MeshOnAnchor;
+	Mesh->SetRelativeLocation(FMath::Lerp(Hip.GetLocation(), Aim.GetLocation(), AimAlpha));
+	Mesh->SetRelativeRotation(FQuat::Slerp(Hip.GetRotation(), Aim.GetRotation(), AimAlpha).Rotator());
+	Mesh->SetRelativeScale3D(FMath::Lerp(Hip.GetScale3D(), Aim.GetScale3D(), AimAlpha));
+
+	// The rig just moved the gun. The hands have to be re-solved onto it every frame, or they
+	// would only ever grip the pose the gun happened to have on the first update.
+	PoseRigHands();
+}
+
+void UProjectEXWeaponViewComponent::PoseRigHands()
+{
+	const USkinnedAsset* ArmsAsset = ArmsMesh ? ArmsMesh->GetSkinnedAsset() : nullptr;
+	if (!ArmsAsset || !Mesh || !Weapon || ArmsMesh->GetBoneSpaceTransforms().Num() == 0)
+	{
+		return;
+	}
+
+	if (!ArmsMesh->DoesSocketExist(TEXT("head"))
+		|| ArmsMesh->GetBoneIndex(TEXT("hand_r")) == INDEX_NONE
+		|| ArmsMesh->GetBoneIndex(TEXT("hand_l")) == INDEX_NONE)
+	{
+		return;
+	}
+
+	ArmsMesh->RefreshBoneTransforms();
+	const FVector HeadLocal = ArmsMesh->GetSocketTransform(TEXT("head"), RTS_Component).GetLocation();
+	if (HeadLocal.SizeSquared() < 100.0f)
+	{
+		return;
+	}
+
+	const FProjectEXHold Hold = HoldForWeapon(Weapon->GripStyle);
+
+	// ApplyRigPose already placed the gun inside this component. The arms mesh is shifted so its
+	// head bone sits on the camera, so adding that same shift brings the gun into arm space.
+	const FTransform GunTransform(Mesh->GetRelativeRotation().Quaternion(), Mesh->GetRelativeLocation() + HeadLocal, Mesh->GetRelativeScale3D());
+
+	// Solve from the reference pose every frame so repeated IK does not accumulate error.
+	ArmsMesh->BoneSpaceTransforms = ArmsAsset->GetRefSkeleton().GetRefBonePose();
+	// Without this the solver reads last frame's component-space pose and feeds on its own output.
+	ArmsMesh->RefreshBoneTransforms();
+
+	const bool bRight = PoseArm(ArmsMesh, TEXT("upperarm_r"), TEXT("lowerarm_r"), TEXT("hand_r"),
+		GunTransform.TransformPosition(Weapon->RightHandOffset), Hold.RightElbowView + HeadLocal, MakeHandRotation(Hold.RightHand));
+	const bool bLeft = PoseArm(ArmsMesh, TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l"),
+		GunTransform.TransformPosition(Weapon->LeftHandOffset), Hold.LeftElbowView + HeadLocal, MakeHandRotation(Hold.LeftHand));
+
+	if (bRight)
+	{
+		CurlHand(ArmsMesh, TEXT("r"), Hold);
+	}
+	if (bLeft)
+	{
+		CurlHand(ArmsMesh, TEXT("l"), Hold);
+	}
+
+	ArmsMesh->RefreshBoneTransforms();
 }
 
 void UProjectEXWeaponViewComponent::PlaceHeldWeapon()
@@ -500,6 +616,8 @@ void UProjectEXWeaponViewComponent::PlaceHeldWeapon()
 	}
 
 	ArmsMesh->BoneSpaceTransforms = ArmsAsset->GetRefSkeleton().GetRefBonePose();
+	// Without this the solver reads last frame's component-space pose and feeds on its own output.
+	ArmsMesh->RefreshBoneTransforms();
 	const bool bRight = PoseArm(ArmsMesh, TEXT("upperarm_r"), TEXT("lowerarm_r"), TEXT("hand_r"), GunTransform.TransformPosition(Weapon->RightHandOffset), Hold.RightElbowView + HeadLocal, MakeHandRotation(Hold.RightHand));
 	const bool bLeft = PoseArm(ArmsMesh, TEXT("upperarm_l"), TEXT("lowerarm_l"), TEXT("hand_l"), GunTransform.TransformPosition(Weapon->LeftHandOffset), Hold.LeftElbowView + HeadLocal, MakeHandRotation(Hold.LeftHand));
 	if (bRight)
@@ -528,6 +646,7 @@ void UProjectEXWeaponViewComponent::RestoreCamera() const
 		if (UCameraComponent* Camera = Character->GetFirstPersonCameraComponent())
 		{
 			Camera->SetFieldOfView(RestingFieldOfView);
+			Camera->FirstPersonFieldOfView = RestingFirstPersonFieldOfView;
 		}
 	}
 }

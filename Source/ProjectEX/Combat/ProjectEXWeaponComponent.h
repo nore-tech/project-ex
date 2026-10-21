@@ -47,6 +47,13 @@ public:
 	UFUNCTION(BlueprintPure, Category="Weapon")
 	bool IsAiming() const;
 
+	/** Drops the local aim state. Sprint uses this, because sprinting cancels ADS. */
+	UFUNCTION(BlueprintCallable, Category="Weapon")
+	void CancelAim();
+
+	/** 1 at hip-fire, AdsLookScale while fully aimed. Local cosmetic only. */
+	float GetAimLookScale() const;
+
 	/** Cosmetic only. Runs after the server accepts a shot and multicasts the shot effect. */
 	UFUNCTION(BlueprintImplementableEvent, Category="Weapon|Presentation")
 	void OnWeaponFired();

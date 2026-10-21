@@ -34,11 +34,15 @@ public:
 	void SetWeapon(UProjectEXWeaponData* NewWeapon);
 	void NotifyFired();
 	bool GetMuzzleLocation(FVector& OutLocation) const;
+	float GetAimAlpha() const { return AimAlpha; }
 
 private:
 
 	void UpdateFirstPersonMesh();
 	void EnsureArms();
+	bool UsesPresentationRig() const;
+	void ApplyRigPose();
+	void PoseRigHands();
 	void AlignArmsToCamera();
 	void PlaceHeldWeapon();
 	void RestoreCamera() const;
@@ -58,6 +62,7 @@ private:
 	float AimAlpha = 0.0f;
 	float WalkSpeedReference = 600.0f;
 	float RestingFieldOfView = 90.0f;
+	float RestingFirstPersonFieldOfView = 70.0f;
 	bool bCapturedFieldOfView = false;
 	bool bHasLastLook = false;
 	bool bReloadWasActive = false;

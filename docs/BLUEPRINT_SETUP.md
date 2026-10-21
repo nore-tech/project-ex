@@ -53,14 +53,19 @@ Already present. Do not add duplicates:
 
 The character Blueprint does not override component events. Subclass `UProjectEXWeaponComponent` and replace the character's Weapon component to use `OnWeaponFired` / `OnWeaponReloaded`.
 
-## BP_Rifle and BP_Pistol
+## Rifle first-person pose
 
-1. Content Browser → Blueprint Class → `ProjectEXWeaponData`. Name it `BP_Rifle` or `BP_Pistol`.
-2. Set `Damage`, `FireInterval`, `MagazineSize`, `ReloadDuration`, `AmmoType`, `RecoilPitch`, `RecoilYaw`.
-3. Set `ViewMesh` to an existing Synty skeletal mesh. Set `GripStyle` to `Rifle` or `Pistol`.
-4. Set `ViewOffset` and `ViewRotation` for the first-person mesh. Tune `RightHandOffset`, `LeftHandOffset`, `GripOffset`, `MuzzleOffset`, and `SightOffset` in mesh space.
-5. Create a `ProjectEXWeaponItemDefinition` asset. Set `WeaponData` to that Blueprint, `EquipKind` to `Weapon`, and `DisplaySkeletalMesh` to the same Synty mesh.
-6. Place an `AProjectEXPickup`, or a Blueprint child of it, and set `ItemDefinition` and `Quantity`.
+The equipped rifle reads `BP_EX_Rifle`. That Blueprint is not placed in the level. Its root is the camera. `DA_RifleData.PresentationRig` points at it, and the rifle pickup uses `DA_RifleData`.
+
+1. Open `/Game/ProjectEX/Blueprints/BP_EX_Rifle`.
+2. Select `HipFireAnchor`. The rifle mesh is attached to it. Move and rotate that anchor. This is hip-fire.
+3. Select `ADSAnchor`. Move it until the rear and front sights line up with `AimMarker`, which sits on the camera aim line. This is aim-down-sights.
+4. Compile and save.
+5. Play `Lvl_FirstPerson`, pick up the rifle, equip it, and hold right mouse to aim.
+
+`ViewOffset` on the data asset does not move this rifle. The anchors do. Aim field of view, transition time, and look sensitivity are `AdsFOV`, `AdsTransitionDuration`, and `AdsLookScale` on `DA_RifleData`.
+
+The pistol has no rig. It still uses the older hand pose.
 
 ## BP_LootContainer
 

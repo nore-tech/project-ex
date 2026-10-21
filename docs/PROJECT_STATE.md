@@ -61,6 +61,14 @@ Code exists. Gameplay beyond the list above was not verified in that session:
 - `EX_Enemy_01` was replaced by the Milestone 2 encounter. `Tools/place_enemy.py` is superseded by `Tools/setup_raid_encounter.py`.
 - Verified in game 2026-10-20: the enemy chases and damages the player (health fell 100 → 10). Not observed: enemy death from player fire.
 
+## Weapon presentation
+
+- The equipped rifle mesh is a local component on the first-person camera. It is not a held actor and it is not attached to a socket.
+- `BP_EX_Rifle` (`AProjectEXWeaponRig`) is the pose source. `HipFireAnchor` is hip-fire. `ADSAnchor` is iron-sight aim. `DA_RifleData.PresentationRig` points at that Blueprint, so the rifle pickup uses it.
+- Hold right mouse to aim. The blend takes `AdsTransitionDuration` (0.18 s) either way. Aimed field of view is 75. Look scale is 0.75. Releasing, switching, unequipping, or dying leaves aim.
+- Firing, ammo, and hitscan are unchanged. Aim does not move the capsule.
+- Not verified in a played session after this change: the on-screen hip pose, sight alignment, firing while aimed, and reload. The running game could not be aimed reliably from this session.
+
 ## Focus
 
 Playable raid loop: deploy, fight, extract or die, deploy again.

@@ -220,13 +220,28 @@ void AProjectEXEnemy::HandleDied(AController* InstigatorController)
 
 void AProjectEXEnemy::HandleHealthChanged(float NewHealth, float NewMaxHealth)
 {
-	if (StatusText && LastKnownHealth >= 0.0f && NewHealth < LastKnownHealth && NewHealth > 0.0f)
+	const float DamageAmount = (LastKnownHealth >= 0.0f) ? (LastKnownHealth - NewHealth) : 0.0f;
+
+	if (StatusText && DamageAmount > 0.0f && NewHealth > 0.0f)
 	{
 		StatusText->SetTextRenderColor(FColor::White);
 		AttackFlashUntil = GetWorld()->GetTimeSeconds() + 0.12f;
 	}
 	LastKnownHealth = NewHealth;
 	UpdateStatusText();
+
+	// Cosmetic only. The health reduction above is the authoritative result and is
+	// never delayed by this. Skipped once the body has been handled so a corpse
+	// cannot keep flinching.
+	if (DamageAmount > 0.0f && !bDeathHandled && HasAuthority())
+	{
+		MulticastHitReaction(DamageAmount, NewHealth <= 0.0f);
+	}
+}
+
+void AProjectEXEnemy::MulticastHitReaction_Implementation(float DamageAmount, bool bLethal)
+{
+	OnEnemyHit(DamageAmount, bLethal);
 }
 
 void AProjectEXEnemy::ApplyEnemyMesh()
